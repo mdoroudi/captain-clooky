@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Captain Clooky</title>
+<!-- Icons come from minadoroudi.com so every game shares the MD icon -->
+<link rel="icon" href="https://www.minadoroudi.com/favicon.svg?v=4" type="image/svg+xml">
+<link rel="icon" href="https://www.minadoroudi.com/favicon-32.png?v=4" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="https://www.minadoroudi.com/apple-touch-icon.png?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E9E4F5;
+    --ink: #221E4D;
+    --hud-ink: #221E4D;
+    --cream: #FFF4E0;
+    --gold: #FFD66B;
+    --orange: #F08A4B;
+    --orange-dark: #9C4A1E;
+    --plum: #B5527A;
+    --purple: #9B5CF6;
+    --shade: rgba(22, 20, 58, 0.78);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #16143A; --ink: #EDE9FF; --hud-ink: #EDE9FF; }
+  }
+  :root[data-theme="dark"] { --bg: #16143A; --ink: #EDE9FF; --hud-ink: #EDE9FF; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Silkscreen", "Courier New", Courier, monospace;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cabinet {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+  }
+  .hud {
+    width: var(--w, 100%);
+    display: flex;
+    align-items: center;
+    gap: 1.2em;
+    color: var(--hud-ink);
+    font-size: clamp(12px, 2.4vmin, 20px);
+    height: 32px;
+  }
+  .hud .spacer { flex: 1; }
+  .hud span, .hud .sound { white-space: nowrap; }
+  @media (max-width: 480px) {
+    .hud { gap: 0.6em; font-size: 11px; }
+    .hud .sound { padding: 0.15em 0.4em; }
+    .hud .wide-only { display: none; }
+  }
+  .hud b { font-weight: 700; }
+  .sound {
+    font: inherit;
+    font-size: inherit;
+    background: none;
+    border: 2px solid currentColor;
+    color: inherit;
+    border-radius: 4px;
+    padding: 0.15em 0.6em;
+    cursor: pointer;
+  }
+  .sound:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .stage {
+    position: relative;
+    width: var(--w, 256px);
+    height: var(--h, 224px);
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border-radius: 6px;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8em;
+    padding: 1em;
+    background: var(--shade);
+    color: var(--cream);
+    text-align: center;
+    border-radius: 6px;
+  }
+  .overlay[hidden] { display: none; }
+  h1 {
+    margin: 0;
+    font-weight: 700;
+    font-size: clamp(24px, 7.5vmin, 68px);
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0.08em 0.08em 0 var(--plum);
+  }
+  h2 {
+    margin: 0;
+    font-weight: 700;
+    font-size: clamp(20px, 5.6vmin, 48px);
+    color: var(--gold);
+    text-shadow: 0.08em 0.08em 0 var(--plum);
+  }
+  .overlay p {
+    margin: 0;
+    max-width: 28em;
+    font-size: clamp(10px, 2.1vmin, 17px);
+    line-height: 1.6;
+  }
+  .big-score { font-size: clamp(16px, 4.2vmin, 34px) !important; }
+  .title-sprite {
+    width: clamp(64px, 16vmin, 140px);
+    height: clamp(64px, 16vmin, 140px);
+    border-radius: 0;
+  }
+  .buttons { display: flex; gap: 0.8em; flex-wrap: wrap; justify-content: center; }
+  .play {
+    font: inherit;
+    font-weight: 700;
+    font-size: clamp(14px, 3.4vmin, 28px);
+    padding: 0.55em 1.3em;
+    border: 0;
+    border-radius: 6px;
+    background: var(--orange);
+    color: #221E4D;
+    cursor: pointer;
+    box-shadow: 0 5px 0 var(--orange-dark);
+  }
+  .play.quiet { background: var(--cream); box-shadow: 0 5px 0 #B9A98C; }
+  .play:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--orange-dark); }
+  .play:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+  .tally { display: grid; grid-template-columns: auto auto; gap: 0.2em 1.4em; font-size: clamp(11px, 2.4vmin, 20px); }
+  .tally span:nth-child(even) { text-align: right; color: var(--gold); }
+  .banner {
+    position: absolute;
+    left: 0; right: 0; top: 36%;
+    text-align: center;
+    font-weight: 700;
+    font-size: clamp(14px, 4.2vmin, 38px);
+    color: var(--gold);
+    text-shadow: 0.08em 0.08em 0 var(--plum);
+    padding: 0 0.6em;
+    line-height: 1.25;
+    pointer-events: none;
+  }
+  .banner[hidden] { display: none; }
+
+  /* ---------- Touch controls (only on touch screens) ---------- */
+  .touch-pad { display: none; }
+  body.touch .touch-pad {
+    display: flex;
+    width: var(--w, 100%);
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+    touch-action: none;
+  }
+  .pad-group { display: flex; gap: 10px; align-items: flex-end; }
+  .pad-col { display: flex; flex-direction: column; gap: 8px; }
+  .tbtn {
+    width: 64px; height: 64px;
+    font: inherit; font-weight: 700; font-size: 22px;
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    background: var(--cream);
+    color: #221E4D;
+    touch-action: none;
+    box-shadow: 0 4px 0 #B9A98C;
+    padding: 0;
+  }
+  .tbtn.small { width: 76px; height: 44px; font-size: 14px; }
+  .tbtn.fire {
+    width: 96px; height: 96px; border-radius: 50%;
+    background: var(--purple); color: #FFF4E0; font-size: 18px;
+    box-shadow: 0 5px 0 #5B2FA8;
+  }
+  .tbtn.on { transform: translateY(3px); box-shadow: 0 1px 0 #B9A98C; filter: brightness(0.92); }
+  .tbtn.fire.on { box-shadow: 0 1px 0 #5B2FA8; }
+  /* Short landscape screens: the pads sit beside the game instead of under it */
+  body.touch.side .touch-pad {
+    position: fixed; left: 0; right: 0; bottom: 12px;
+    width: auto; padding: 0 12px;
+    pointer-events: none;
+  }
+  body.touch.side .pad-group { pointer-events: auto; }
+</style>
+</head>
+<body>
+<div class="cabinet" id="cabinet">
+  <div class="hud" aria-live="polite">
+    <span>Score <b id="score">0</b></span>
+    <span id="rank">Private</span>
+    <span class="wide-only" id="levelName">Farm River</span>
+    <span class="spacer"></span>
+    <!-- Test buttons: hidden unless test mode is on (open the game with ?dev=1; ?dev=0 turns it off). -->
+    <button class="sound" id="skipBtn" type="button" hidden>Skip level</button>
+    <button class="sound" id="feedBtn" type="button" hidden>Full feed</button>
+    <button class="sound" id="pauseBtn" type="button" hidden>Pause</button>
+    <button class="sound" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="game" aria-label="Captain Clooky game area"></canvas>
+    <div class="banner" id="banner" hidden></div>
+
+    <div class="overlay" id="titleScreen">
+      <h1>Captain Clooky</h1>
+      <canvas class="title-sprite" id="titleSprite" width="32" height="32" aria-hidden="true"></canvas>
+      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks and raccoon planes with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
+      <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
+      <p id="titleBest">Best 0 · Private</p>
+      <button class="play" id="playBtn" type="button">Play</button>
+    </div>
+
+    <div class="overlay" id="levelScreen" hidden>
+      <h2 id="levelDoneTitle">Level complete!</h2>
+      <div class="tally" id="tally"></div>
+      <button class="play" id="nextBtn" type="button">Next level</button>
+    </div>
+
+    <div class="overlay" id="overScreen" hidden>
+      <h2>Game over</h2>
+      <p class="big-score" id="finalScore">Score 0</p>
+      <p id="finalRank">Rank reached: Private</p>
+      <p id="finalBest"></p>
+      <div class="buttons">
+        <button class="play" id="continueBtn" type="button">Continue</button>
+        <button class="play quiet" id="titleBtn" type="button">Back to title</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="pauseScreen" hidden>
+      <h2>Paused</h2>
+      <button class="play" id="resumeBtn" type="button">Keep flying</button>
+    </div>
+  </div>
+  <div class="touch-pad" id="touchPad" aria-hidden="true">
+    <div class="pad-group">
+      <button class="tbtn" data-key="left" type="button" tabindex="-1">◀</button>
+      <button class="tbtn" data-key="right" type="button" tabindex="-1">▶</button>
+    </div>
+    <div class="pad-group">
+      <div class="pad-col">
+        <button class="tbtn small" data-key="up" type="button" tabindex="-1">Fast</button>
+        <button class="tbtn small" data-key="down" type="button" tabindex="-1">Slow</button>
+      </div>
+      <button class="tbtn fire" data-key="fire" type="button" tabindex="-1">FIRE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // =====================================================================
+  //  GAME CONFIG: tweak balance here
+  // =====================================================================
+  const CONFIG = {
+    speed: { slow: 26, normal: 40, fast: 64 },   // river scroll speed, pixels per second
+    steerSpeed: 95,                               // Clooky's left/right speed, pixels per second
+    feed: {
+      secondsFull: 30,          // a full meter lasts this long
+      lowWarning: 0.25,         // blink and beep below this
+      refillPerSecond: 0.55     // how fast a GRUBS crate refills the meter
+    },
+    laser: { cooldown: 0.22, speed: 230, jamSeconds: 3 },
+    lives: { start: 3, max: 5, extraEvery: 2000 },
+    invulnerableSeconds: 2,
+    points: {
+      fox: 30, hawk: 100, raccoon: 60, crate: 20, medic: -100, wall: 50,
+      levelBonus: 500, feedBonusMax: 250
+    },
+    level: {
+      sections: 4,              // sandbag walls sit between sections
+      sectionLength: 1400,      // pixels; about 35 seconds at normal speed
+      startLength: 90           // calm stretch before section 1
+    },
+    ranks: [
+      { at: 0,     name: 'Private' },
+      { at: 1500,  name: 'Corporal' },
+      { at: 3000,  name: 'Sergeant' },
+      { at: 4500,  name: 'Lieutenant' },
+      { at: 6000,  name: 'Captain' },
+      { at: 7500,  name: 'Major' },
+      { at: 9000,  name: 'Colonel' },
+      { at: 10500, name: 'General' }
+    ]
+  };
+
+  // Difficulty for a level (1, 2, 3, ...). Level 1 is gentle; each level and each full loop gets harder.
+  function difficulty(level) {
+    const d = level - 1;
+    return {
+      minWidth: Math.max(58, 124 - d * 8),        // narrowest river
+      maxWidth: Math.max(92, 196 - d * 9),        // widest river
+      drift: Math.min(2.6, 1.1 + d * 0.22),       // how quickly the river bends (pixels per row)
+      enemySpeed: Math.min(2.4, 1 + d * 0.13),
+      enemiesPerSection: Math.min(18, 5 + d * 2),
+      crateGap: Math.min(440, 240 + d * 32),      // distance between GRUBS crates
+      medicsPerSection: d === 0 ? 1 : 2,
+      weights: {                                   // which enemies show up
+        fox: Math.max(2, 6 - d),
+        raccoon: 2 + Math.min(3, d),
+        hawk: d === 0 ? 0.6 : 1 + Math.min(3, d * 0.7)
+      }
+    };
+  }
+
+  const THEMES = [
+    { key: 'farm',   name: 'Farm River',
+      water: '#3C82D2', streak: '#6FA8E6', land: '#5DAE4A', landDot: '#4C9A3C', shore: '#D9C27A', shoreW: 2,
+      decor: ['barn', 'hay', 'hay', 'fence', 'fence', 'tree', 'tree', 'flowers'] },
+    { key: 'jungle', name: 'Jungle River',
+      water: '#2E8A7E', streak: '#57B3A5', land: '#2F7A33', landDot: '#245F28', shore: '#5A4A2A', shoreW: 2,
+      decor: ['jtree', 'jtree', 'jtree', 'jtree', 'palm', 'palm', 'fern', 'vine', 'vine'], density: 2.2 },
+    { key: 'desert', name: 'Desert Canyon',
+      water: '#3E8FC0', streak: '#77B8DE', land: '#E0A060', landDot: '#CC8A48', shore: '#A85E26', shoreW: 4,
+      decor: ['cactus', 'cactus', 'rock', 'rock', 'mesa', 'bones'] },
+    { key: 'ice',    name: 'Icy River',
+      water: '#4F9FD6', streak: '#BFE3F7', land: '#F4F8FC', landDot: '#DCE9F3', shore: '#BFD9EA', shoreW: 3,
+      decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'] }
+  ];
+  const themeFor = level => THEMES[(level - 1) % THEMES.length];
+
+  // =====================================================================
+  //  Setup
+  // =====================================================================
+  const W = 256, H = 224;
+  const PANEL_H = 20, PLAY_H = H - PANEL_H;   // bottom strip shows lives, feed and rank
+  const PLAYER_Y = 168;                        // Clooky's fixed screen row
+  const ROW = 4;                               // river is stored in 4-pixel rows
+  const canvas = document.getElementById('game');
+  canvas.width = W; canvas.height = H;
+  let ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  const $ = id => document.getElementById(id);
+  const stage = $('stage'), cabinet = $('cabinet');
+  const scoreEl = $('score'), rankEl = $('rank'), levelNameEl = $('levelName');
+  const titleScreen = $('titleScreen'), overScreen = $('overScreen'), pauseScreen = $('pauseScreen'), levelScreen = $('levelScreen');
+  const banner = $('banner'), soundBtn = $('soundBtn'), pauseBtn = $('pauseBtn');
+
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouch) document.body.classList.add('touch');
+
+  // Fit the game to the screen, keeping its shape (and leaving room for touch pads)
+  function fit() {
+    const vw = cabinet.clientWidth, vh = cabinet.clientHeight;
+    const side = isTouch && vw > vh * 1.3 && vh < 620;
+    document.body.classList.toggle('side', side);
+    const padH = isTouch && !side ? 112 : 0;
+    const padW = side ? 2 * 190 : 0;
+    const availW = vw - 16 - padW;
+    const availH = vh - 16 - 40 - padH;
+    const s = Math.max(0.5, Math.min(availW / W, availH / H));
+    const w = Math.floor(W * s), h = Math.floor(H * s);
+    document.documentElement.style.setProperty('--w', w + 'px');
+    document.documentElement.style.setProperty('--h', h + 'px');
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+  fit();
+
+  // =====================================================================
+  //  Saved best score and rank
+  // =====================================================================
+  const BEST_KEY = 'captainClookyBest', RANK_KEY = 'captainClookyBestRank';
+  function loadNum(k) { try { return Number(localStorage.getItem(k)) || 0; } catch (e) { return 0; } }
+  function saveNum(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+
+  // =====================================================================
+  //  Sound (synthesized with Web Audio, no files)
+  // =====================================================================
+  let audio = null, soundOn = true, noiseBuf = null;
+  function ensureAudio() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } }
+    if (audio && audio.state === 'suspended') audio.resume();
+  }
+  function tone(freq, dur, type = 'square', vol = 0.06, slide = 0, delay = 0) {
+    if (!audio || !soundOn) return;
+    const t = audio.currentTime + delay;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audio.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noise(dur, vol = 0.1, f0 = 2000, f1 = 300, delay = 0, type = 'bandpass') {
+    if (!audio || !soundOn) return;
+    if (!noiseBuf) {
+      noiseBuf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = audio.currentTime + delay;
+    const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    src.buffer = noiseBuf;
+    f.type = type; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(audio.destination);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+  function buk(f0, f1, dur, delay = 0, vol = 0.12) {
+    if (!audio || !soundOn) return;
+    const t = audio.currentTime + delay;
+    const o = audio.createOscillator(), bp = audio.createBiquadFilter(), g = audio.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(1300, t); bp.Q.value = 2.5;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp).connect(g).connect(audio.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  const sfx = {
+    pew()      { tone(1250, 0.08, 'square', 0.035, -800); if (Math.random() < 0.12) buk(520, 330, 0.07, 0.05, 0.08); },
+    bawk()     { buk(520, 330, 0.07, 0); buk(420, 820, 0.09, 0.12, 0.16); buk(820, 360, 0.3, 0.21, 0.16); noise(0.3, 0.08, 1200, 200); },
+    zap()      { noise(0.18, 0.08, 2400, 400); tone(520, 0.12, 'square', 0.04, -300); },
+    pfft()     { noise(0.55, 0.12, 900, 120, 0, 'lowpass'); tone(300, 0.5, 'sawtooth', 0.04, -220); },
+    boom()     { noise(0.5, 0.18, 800, 60, 0, 'lowpass'); tone(110, 0.4, 'triangle', 0.12, -60); },
+    lowFeed()  { tone(988, 0.07, 'square', 0.045); },
+    refill(f)  { tone(320 + f * 600, 0.05, 'square', 0.03); },
+    lifeUp()   { [659, 880, 1175].forEach((f, i) => tone(f, 0.1, 'square', 0.05, 0, i * 0.08)); },
+    promote()  { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.3 : 0.1, 'square', 0.05, 0, i * 0.1)); },
+    levelDone(){ [523, 587, 659, 784, 880, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.09)); tone(1047, 0.4, 'triangle', 0.06, 0, 0.6); },
+    start()    { tone(523, 0.08, 'square', 0.05); tone(659, 0.08, 'square', 0.05, 0, 0.09); tone(784, 0.12, 'square', 0.05, 0, 0.18); }
+  };
+
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    ensureAudio();
+  });
+
+  // =====================================================================
+  //  Level building (seeded, so each level is the same every time)
+  // =====================================================================
+  function mulberry32(a) {
+    return () => {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  const HIT = {                    // hit boxes (width, height), centred on the object
+    fox: [20, 10], hawk: [18, 10], raccoon: [18, 14], crate: [24, 16], medic: [14, 10]
+  };
+  const REFILL_ZONE = [24, 30];    // flying through this area around a crate refills feed
+
+  function buildLevel(level) {
+    const rng = mulberry32(level * 7919 + 13);
+    const D = difficulty(level);
+    const { sections, sectionLength, startLength } = CONFIG.level;
+    const wallYs = [];
+    for (let i = 1; i < sections; i++) wallYs.push(startLength + i * sectionLength);
+    const baseY = startLength + sections * sectionLength;
+    const rows = Math.ceil((baseY + 400) / ROW);
+    const L = new Int16Array(rows), R = new Int16Array(rows);
+
+    // River banks: wander toward random targets, never bending faster than the difficulty allows,
+    // so there is always a smooth, passable channel.
+    let c = W / 2, w = D.maxWidth, tc = c, tw = w, nextBend = 0;
+    for (let r = 0; r < rows; r++) {
+      const y = r * ROW;
+      const nearWall = wallYs.some(wy => y > wy - 150 && y < wy + 50);
+      if (y < startLength + 60) { tc = W / 2; tw = D.maxWidth; }
+      else if (y > baseY - 180) { tc = W / 2; tw = 172; }
+      else if (nearWall) { tc = c; tw = 104; }
+      else if (r >= nextBend) {
+        tw = D.minWidth + rng() * (D.maxWidth - D.minWidth);
+        const half = tw / 2 + 12;
+        tc = half + rng() * (W - 2 * half);
+        nextBend = r + 14 + Math.floor(rng() * 26);
+      }
+      c += clamp(tc - c, -D.drift, D.drift);
+      w += clamp(tw - w, -1.4, 1.4);
+      L[r] = clamp(Math.round(c - w / 2), 8, W - 60);
+      R[r] = clamp(Math.round(c + w / 2), L[r] + 52, W - 8);
+    }
+    const rowOf = y => clamp(Math.floor(y / ROW), 0, rows - 1);
+    const bankL = y => L[rowOf(y)], bankR = y => R[rowOf(y)];
+    // A spot on the water that stays clear of the banks for a stretch above and below,
+    // so reaching it never means hugging a bending shore.
+    const waterX = (y, margin) => {
+      let l = 0, rr = W;
+      for (let yy = y - 40; yy <= y + 40; yy += ROW) { l = Math.max(l, bankL(yy)); rr = Math.min(rr, bankR(yy)); }
+      l += margin; rr -= margin;
+      return rr > l ? l + rng() * (rr - l) : (bankL(y) + bankR(y)) / 2;
+    };
+    const tooCloseToWall = y => wallYs.some(wy => Math.abs(y - wy) < 70) || y > baseY - 120;
+
+    // Objects (the plan is never changed; each life copies the part still ahead)
+    const plan = [];
+    for (let s = 0; s < sections; s++) {
+      const s0 = startLength + s * sectionLength, s1 = s0 + sectionLength;
+      const used = [];
+      const free = y => !used.some(u => Math.abs(u - y) < 26) && !tooCloseToWall(y);
+
+      // GRUBS crates, evenly spaced so feed never runs out on a careful run
+      for (let y = s0 + D.crateGap * 0.55; y < s1 - 40; y += D.crateGap * (0.85 + rng() * 0.3)) {
+        if (tooCloseToWall(y)) continue;
+        plan.push({ type: 'crate', x: waterX(y, 20), y }); used.push(y);
+      }
+      // Enemies, spread through the section
+      const total = D.weights.fox + D.weights.raccoon + D.weights.hawk;
+      for (let i = 0; i < D.enemiesPerSection; i++) {
+        let y = s0 + 90 + (i + 0.2 + rng() * 0.6) * ((sectionLength - 150) / D.enemiesPerSection);
+        let tries = 0;
+        while (!free(y) && tries++ < 6) y += 28;
+        if (!free(y)) continue;
+        const pick = rng() * total;
+        const type = pick < D.weights.fox ? 'fox' : pick < D.weights.fox + D.weights.raccoon ? 'raccoon' : 'hawk';
+        if (type === 'hawk') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
+        else if (type === 'raccoon') plan.push({ type, x: (bankL(y) + bankR(y)) / 2, y, amp: 24 + rng() * 26, phase: rng() * 6.28 });
+        else plan.push({ type, x: waterX(y, 14), y, dir: rng() < 0.5 ? -1 : 1 });
+        used.push(y);
+      }
+      // Medic chicks (don't shoot!)
+      for (let i = 0; i < D.medicsPerSection; i++) {
+        let y = s0 + 160 + rng() * (sectionLength - 320), tries = 0;
+        while (!free(y) && tries++ < 10) y = s0 + 160 + rng() * (sectionLength - 320);
+        if (!free(y)) continue;
+        plan.push({ type: 'medic', x: waterX(y, 12), y }); used.push(y);
+      }
+    }
+    for (const y of wallYs) plan.push({ type: 'wall', x: 0, y });
+    plan.sort((a, b) => a.y - b.y);
+
+    // Scenery on the banks (checked so it never pokes into the water)
+    const theme = themeFor(level);
+    const decor = [];
+    const density = theme.density || 1;
+    for (let y = 10; y < baseY + 300; y += (14 + rng() * 22) / density) {
+      for (const side of [-1, 1]) {
+        if (rng() < 0.35) continue;
+        const type = theme.decor[Math.floor(rng() * theme.decor.length)];
+        const [dw, dh] = DECOR_SIZE[type];
+        if (type === 'vine' || type === 'floe') {   // these hug the shoreline
+          decor.push({ type, side, y, x: 0 });
+          continue;
+        }
+        let edge = side < 0 ? W : 0;
+        for (let yy = y - dh; yy <= y + 2; yy += ROW) edge = side < 0 ? Math.min(edge, bankL(yy)) : Math.max(edge, bankR(yy));
+        const room = side < 0 ? edge - 6 - dw : W - edge - 6 - dw;
+        if (room < 2) continue;
+        const x = side < 0 ? 2 + rng() * room : edge + 4 + rng() * room;
+        if (Math.abs(y - baseY) < 40) continue;
+        decor.push({ type, side, y, x: Math.round(x) });
+      }
+    }
+    return { level, L, R, rows, bankL, bankR, wallYs, baseY, plan, decor, theme };
+  }
+
+  // =====================================================================
+  //  Game state
+  // =====================================================================
+  let state = 'title';   // title | intro | playing | dying | levelDone | over | paused
+  let resumeState = 'playing';
+  let lv = null;                         // the current level's layout
+  let level = 1, score = 0, lives = CONFIG.lives.start, nextLifeAt = CONFIG.lives.extraEvery;
+  let rankIdx = 0, peakRank = 0, best = loadNum(BEST_KEY), bestRank = loadNum(RANK_KEY);
+  let dist = 0, px = W / 2, feed = 1, checkpointY = 0;
+  let objects = [], lasers = [], particles = [];
+  let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
+  let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
+  let refilling = false, deathCause = '';
+
+  const sy = wy => PLAYER_Y - (wy - dist);   // world y (distance up the river) -> screen y
+
+  function updateHud() {
+    scoreEl.textContent = score.toLocaleString();
+    rankEl.textContent = CONFIG.ranks[rankIdx].name;
+    levelNameEl.textContent = lv ? lv.theme.name : THEMES[0].name;
+  }
+  function refreshTitleBest() {
+    $('titleBest').textContent = 'Best ' + best.toLocaleString() + ' · ' + CONFIG.ranks[bestRank].name;
+  }
+  refreshTitleBest();
+
+  function showBanner(text, secs) {
+    banner.textContent = text;
+    banner.hidden = false;
+    clearTimeout(showBanner.t);
+    showBanner.t = setTimeout(() => { banner.hidden = true; }, secs * 1000);
+  }
+
+  function rankFor(points) {
+    let r = 0;
+    while (r + 1 < CONFIG.ranks.length && points >= CONFIG.ranks[r + 1].at) r++;
+    return r;
+  }
+
+  function addScore(n) {
+    score = Math.max(0, score + n);
+    while (score >= nextLifeAt) {
+      nextLifeAt += CONFIG.lives.extraEvery;
+      if (lives < CONFIG.lives.max) { lives++; showBanner('+1 life!', 1.2); sfx.lifeUp(); }
+    }
+    const r = rankFor(score);                // rank follows the score, up and down
+    if (r > peakRank) peakRank = r;
+    if (r > rankIdx) {
+      showBanner('Promoted to ' + CONFIG.ranks[r].name + '!', 1.8);
+      sfx.promote();
+      if (r > bestRank) { bestRank = r; saveNum(RANK_KEY, bestRank); }
+    }
+    rankIdx = r;
+    if (score > best) { best = score; saveNum(BEST_KEY, best); }
+    updateHud();
+  }
+
+  // Copy the part of the plan that is still ahead of the respawn point into live objects
+  function spawnObjectsFrom(y) {
+    objects = [];
+    for (const p of lv.plan) {
+      if (p.type === 'wall' ? p.y <= checkpointY : p.y < y + 70) continue;
+      const o = { ...p, alive: true, t: 0 };
+      if (o.type === 'crate') { o.drop = 1; o.landed = false; }
+      if (o.type === 'hawk') { o.active = false; o.x = o.side < 0 ? 8 : W - 8; }
+      if (o.type === 'raccoon') o.baseX = o.x;
+      objects.push(o);
+    }
+  }
+
+  function startLevel(announce) {
+    lv = buildLevel(level);
+    checkpointY = 0;
+    placePlayer(0);
+    state = 'intro';
+    timer = 2.0;
+    showBanner(announce || 'Level ' + level + ' — ' + lv.theme.name, 2.0);
+    buk(520, 330, 0.07, 0); buk(540, 340, 0.07, 0.14); buk(420, 760, 0.09, 0.32, 0.14); buk(760, 380, 0.22, 0.41, 0.14);
+    updateHud();
+  }
+
+  function placePlayer(y) {
+    dist = y;
+    px = (lv.bankL(dist) + lv.bankR(dist)) / 2;
+    feed = 1;
+    lasers = []; jamT = 0; fireCooldown = 0;
+    spawnObjectsFrom(dist);
+  }
+
+  function hideOverlays() {
+    titleScreen.hidden = true; overScreen.hidden = true; pauseScreen.hidden = true; levelScreen.hidden = true;
+  }
+
+  function newGame() {
+    ensureAudio();
+    level = 1; score = 0; lives = CONFIG.lives.start; nextLifeAt = CONFIG.lives.extraEvery; rankIdx = 0; peakRank = 0;
+    particles = [];
+    hideOverlays();
+    pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
+    sfx.start();
+    startLevel();
+  }
+
+  // Continue after game over: same level, fresh lives, score back to zero
+  function continueGame() {
+    ensureAudio();
+    score = 0; lives = CONFIG.lives.start; nextLifeAt = CONFIG.lives.extraEvery; rankIdx = 0; peakRank = 0;
+    particles = [];
+    hideOverlays();
+    pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
+    sfx.start();
+    startLevel();
+  }
+
+  function backToTitle() {
+    hideOverlays();
+    state = 'title';
+    titleScreen.hidden = false;
+    pauseBtn.hidden = true;
+    banner.hidden = true;
+    refreshTitleBest();
+    $('playBtn').focus({ preventScroll: true });
+  }
+
+  function die(cause) {
+    if (state !== 'playing') return;
+    deathCause = cause;
+    state = 'dying';
+    timer = 1.7;
+    lives--;
+    puff(px, dist, 14, true);
+    sfx.bawk();
+    if (navigator.vibrate) { try { navigator.vibrate(150); } catch (e) {} }
+    showBanner(cause === 'feed' ? 'Out of feed!' : cause === 'bank' ? 'Bonk! Watch the riverbank!' : cause === 'wall' ? 'Shoot the sandbags!' : 'Bawk!', 1.5);
+    updateHud();
+  }
+
+  function respawn() {
+    placePlayer(checkpointY ? checkpointY + 24 : 0);
+    invulnT = CONFIG.invulnerableSeconds;
+    state = 'playing';
+  }
+
+  function gameOver() {
+    state = 'over';
+    pauseBtn.hidden = true;
+    $('finalScore').textContent = 'Score ' + score.toLocaleString();
+    $('finalRank').textContent = 'Rank reached: ' + CONFIG.ranks[peakRank].name;
+    $('finalBest').textContent = score >= best && score > 0 ? 'New best score!' : 'Best ' + best.toLocaleString() + ' · ' + CONFIG.ranks[bestRank].name;
+    overScreen.hidden = false;
+    $('continueBtn').focus({ preventScroll: true });
+  }
+
+  function completeLevel() {
+    state = 'levelDone';
+    const feedBonus = Math.round(feed * CONFIG.points.feedBonusMax);
+    const before = score;
+    addScore(CONFIG.points.levelBonus + feedBonus);
+    sfx.levelDone();
+    $('levelDoneTitle').textContent = 'Level ' + level + ' complete!';
+    $('tally').innerHTML =
+      '<span>Base reached</span><span>+' + CONFIG.points.levelBonus + '</span>' +
+      '<span>Feed left</span><span>+' + feedBonus + '</span>' +
+      '<span>Score</span><span>' + score.toLocaleString() + '</span>';
+    levelScreen.hidden = false;
+    $('nextBtn').focus({ preventScroll: true });
+    timer = 6;
+    return before;
+  }
+
+  function nextLevel() {
+    if (state !== 'levelDone') return;
+    levelScreen.hidden = true;
+    level++;
+    startLevel();
+  }
+
+  // =====================================================================
+  //  Effects
+  // =====================================================================
+  function puff(x, wy, n, feathers, fur) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = 10 + Math.random() * 30;
+      particles.push({ kind: 'smoke', x, wy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6 + Math.random() * 0.5, size: 3 + Math.random() * 4 });
+    }
+    const bits = feathers ? [CHICKENS[chicken].body, CHICKENS[chicken].wing, CHICKENS[chicken].wingEdge] : fur || null;
+    if (bits) for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = 20 + Math.random() * 40;
+      particles.push({ kind: 'bit', x, wy, vx: Math.cos(a) * s, vy: Math.sin(a) * s + 10, life: 0.9 + Math.random() * 0.6, color: bits[i % bits.length] });
+    }
+  }
+
+  // =====================================================================
+  //  Input: keyboard, touch pads, game controller
+  // =====================================================================
+  const keys = { left: false, right: false, up: false, down: false, fire: false };
+  const touch = { left: false, right: false, up: false, down: false, fire: false };
+  const pad = { left: false, right: false, up: false, down: false, fire: false };
+  const held = k => keys[k] || touch[k] || pad[k];
+
+  const KEYMAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right',
+    ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ' ': 'fire' };
+
+  window.addEventListener('keydown', e => {
+    const k = KEYMAP[e.key];
+    const onButton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+    if ((e.key === ' ' || e.key === 'Enter') && !onButton) {
+      if (state === 'title') { e.preventDefault(); newGame(); return; }
+      if (state === 'over') { e.preventDefault(); continueGame(); return; }
+      if (state === 'levelDone') { e.preventDefault(); nextLevel(); return; }
+    }
+    if (k) { keys[k] = true; if (state === 'playing' || state === 'intro' || k !== 'fire') e.preventDefault(); }
+    if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && state !== 'title' && state !== 'over') togglePause();
+  });
+  window.addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k) keys[k] = false; });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  // Touch pads: every button tracks its own finger, so steering and firing work together
+  document.querySelectorAll('.tbtn').forEach(btn => {
+    const k = btn.dataset.key;
+    const down = e => {
+      e.preventDefault(); ensureAudio();
+      touch[k] = true; btn.classList.add('on');
+      try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    };
+    const up = () => { touch[k] = false; btn.classList.remove('on'); };
+    btn.addEventListener('pointerdown', down);
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('lostpointercapture', up);
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  });
+
+  // Game controller (Xbox etc.): stick or D-pad steers and sets speed, A or right trigger fires,
+  // A also starts / continues / next level, Menu pauses.
+  const padPrev = {};
+  function pollGamepad() {
+    pad.left = pad.right = pad.up = pad.down = pad.fire = false;
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of pads) {
+      if (!gp) continue;
+      const pressed = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+      const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+      if (ax < -0.3 || pressed(14)) pad.left = true;
+      if (ax > 0.3 || pressed(15)) pad.right = true;
+      if (ay < -0.5 || pressed(12)) pad.up = true;
+      if (ay > 0.5 || pressed(13)) pad.down = true;
+      const a = pressed(0), menu = pressed(9);
+      if (a || pressed(7)) pad.fire = true;
+      const wasA = padPrev[gp.index + 'a'], wasMenu = padPrev[gp.index + 'm'];
+      if (a && !wasA) {
+        ensureAudio();
+        if (state === 'title') newGame();
+        else if (state === 'over') continueGame();
+        else if (state === 'levelDone') nextLevel();
+        else if (state === 'paused') togglePause();
+      }
+      if (menu && !wasMenu && state !== 'title' && state !== 'over') togglePause();
+      padPrev[gp.index + 'a'] = a;
+      padPrev[gp.index + 'm'] = menu;
+    }
+  }
+  window.addEventListener('gamepadconnected', () => showBanner('Controller connected!', 1.5));
+
+  function togglePause() {
+    if (state === 'paused') {
+      state = resumeState;
+      pauseScreen.hidden = true;
+      pauseBtn.textContent = 'Pause';
+      ensureAudio();
+    } else if (state === 'playing' || state === 'intro' || state === 'dying' || state === 'levelDone') {
+      if (state === 'levelDone') return;
+      resumeState = state;
+      state = 'paused';
+      pauseScreen.hidden = false;
+      pauseBtn.textContent = 'Resume';
+      $('resumeBtn').focus({ preventScroll: true });
+    }
+  }
+  pauseBtn.addEventListener('click', togglePause);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state !== 'paused') togglePause(); });
+
+  // =====================================================================
+  //  Update
+  // =====================================================================
+  function boxHit(ax, ay, aw, ah, bx, by, bw, bh) {
+    return Math.abs(ax - bx) * 2 < aw + bw && Math.abs(ay - by) * 2 < ah + bh;
+  }
+
+  function hitObject(o) {
+    const P = CONFIG.points;
+    if (o.type === 'wall') {
+      o.alive = false;
+      checkpointY = o.y;
+      addScore(P.wall);
+      sfx.boom();
+      for (let x = lv.bankL(o.y) + 6; x < lv.bankR(o.y); x += 12) {
+        puff(x, o.y, 2, false, ['#C8B07A', '#8E7648', '#E2CFA0']);
+      }
+      showBanner('Checkpoint!', 1.1);
+      return;
+    }
+    if (o.type === 'medic') {
+      // The medic chick is never hurt: the laser just fizzles against her raft
+      addScore(P.medic);
+      jamT = CONFIG.laser.jamSeconds;
+      o.wobble = 0.6;
+      sfx.pfft();
+      for (let i = 0; i < 4; i++) {
+        particles.push({ kind: 'bit', x: o.x + (Math.random() - 0.5) * 10, wy: o.y - 6, vx: (Math.random() - 0.5) * 30, vy: 20 + Math.random() * 20, life: 0.5, color: '#E0CCFF' });
+      }
+      showBanner('Oops! Not the medic! -100', 1.6);
+      return;
+    }
+    o.alive = false;
+    addScore(P[o.type]);
+    sfx.zap();
+    const fur = o.type === 'fox' ? ['#E07A2E', '#FFFFFF', '#5B6B2E']
+      : o.type === 'hawk' ? ['#8A5A2B', '#D8B07A', '#FFFFFF']
+      : o.type === 'raccoon' ? ['#8C8C94', '#2E2E36', '#6B7A3A'] : ['#A8733A', '#C9924F', '#FFFFFF'];
+    puff(o.x, o.y, 8, false, fur);
+  }
+
+  function update(dt) {
+    clock += dt;
+    for (const p of particles) {
+      p.x += p.vx * dt; p.wy -= p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    if (state === 'intro') {
+      timer -= dt;
+      steer(dt);
+      if (timer <= 0) { state = 'playing'; banner.hidden = true; }
+      return;
+    }
+    if (state === 'dying') {
+      timer -= dt;
+      if (timer <= 0) { if (lives <= 0) gameOver(); else respawn(); }
+      return;
+    }
+    if (state === 'levelDone') {
+      timer -= dt;
+      if (timer <= 0) nextLevel();
+      return;
+    }
+    if (state !== 'playing') return;
+
+    // Speed: Up = faster, Down = slower, nothing = normal
+    const S = CONFIG.speed;
+    speedNow = held('up') && !held('down') ? S.fast : held('down') && !held('up') ? S.slow : S.normal;
+    dist += speedNow * dt;
+    steer(dt);
+    if (invulnT > 0) invulnT -= dt;
+
+    // Feed drains over time
+    feed -= dt / CONFIG.feed.secondsFull;
+    if (feed < CONFIG.feed.lowWarning) {
+      lowBeepT -= dt;
+      if (lowBeepT <= 0) { sfx.lowFeed(); lowBeepT = 0.5; }
+    }
+    if (feed <= 0) { feed = 0; die('feed'); return; }
+
+    // Lasers
+    fireCooldown -= dt;
+    if (jamT > 0) {
+      jamT -= dt;
+      jamPuffT -= dt;
+      if (jamPuffT <= 0) {
+        particles.push({ kind: 'smoke', x: px + (Math.random() - 0.5) * 4, wy: dist + 12, vx: (Math.random() - 0.5) * 10, vy: -18, life: 0.6, size: 3 });
+        jamPuffT = 0.15;
+      }
+      if (jamT <= 0) showBanner('Laser fixed!', 0.9);
+    } else if (held('fire') && fireCooldown <= 0) {
+      lasers.push({ x: px, wy: dist + 12 });
+      fireCooldown = CONFIG.laser.cooldown;
+      sfx.pew();
+    }
+    for (const l of lasers) l.wy += (CONFIG.laser.speed + speedNow) * dt;
+    lasers = lasers.filter(l => sy(l.wy) > -8 && !l.used);
+
+    // Objects move
+    const D = difficulty(level);
+    for (const o of objects) {
+      if (!o.alive) continue;
+      o.t += dt;
+      const onScreen = sy(o.y) > -24;
+      if (o.type === 'fox' && onScreen) {
+        o.x += o.dir * 14 * D.enemySpeed * dt;
+        const l = lv.bankL(o.y) + 12, r = lv.bankR(o.y) - 12;
+        if (o.x < l) { o.x = l; o.dir = 1; }
+        if (o.x > r) { o.x = r; o.dir = -1; }
+      } else if (o.type === 'raccoon' && onScreen) {
+        o.x = o.baseX + Math.sin(o.t * 2.2 * D.enemySpeed + o.phase) * o.amp;
+      } else if (o.type === 'hawk') {
+        if (!o.active && o.y - dist < 125) { o.active = true; buk(900, 1300, 0.12, 0, 0.06); }
+        if (o.active) o.x -= o.side * 110 * D.enemySpeed * dt;
+        if (o.active && (o.x < -30 || o.x > W + 30)) o.alive = false;
+      } else if (o.type === 'medic' && o.wobble > 0) {
+        o.wobble -= dt;
+      } else if (o.type === 'crate' && onScreen && !o.landed) {
+        o.drop = Math.max(0, o.drop - dt / 1.4);
+        if (o.drop === 0) o.landed = true;
+      }
+    }
+
+    // Laser hits
+    for (const l of lasers) {
+      for (const o of objects) {
+        if (!o.alive || l.used) continue;
+        if (o.type === 'wall') {
+          if (l.wy >= o.y - 6 && l.wy <= o.y + 8 && l.x > lv.bankL(o.y) && l.x < lv.bankR(o.y)) { l.used = true; hitObject(o); }
+          continue;
+        }
+        if (o.type === 'crate' && !o.landed) continue;
+        const [bw, bh] = HIT[o.type];
+        if (boxHit(l.x, l.wy, 2, 8, o.x, o.y, bw, bh)) { l.used = true; hitObject(o); }
+      }
+    }
+    lasers = lasers.filter(l => !l.used);
+
+    // Clooky bumps into things
+    refilling = false;
+    for (const o of objects) {
+      if (!o.alive) continue;
+      if (o.type === 'wall') {
+        if (Math.abs(dist - o.y) < 8) { die('wall'); return; }
+        continue;
+      }
+      if (o.type === 'crate' && !o.landed) continue;
+      const [bw, bh] = o.type === 'crate' ? REFILL_ZONE : HIT[o.type];
+      if (!boxHit(px, dist, 12, 10, o.x, o.y, bw, bh)) continue;
+      if (o.type === 'crate') refilling = true;
+      else if (o.type === 'medic') { /* safe */ }
+      else if (invulnT <= 0) { die('enemy'); return; }
+    }
+    if (refilling && feed < 1) {
+      feed = Math.min(1, feed + CONFIG.feed.refillPerSecond * dt);
+      refillBeepT -= dt;
+      if (refillBeepT <= 0) { sfx.refill(feed); refillBeepT = 0.1; }
+    }
+
+    // Riverbanks
+    const half = 5;
+    for (let yy = dist - 5; yy <= dist + 5; yy += ROW) {
+      if (px - half < lv.bankL(yy) || px + half > lv.bankR(yy)) { die('bank'); return; }
+    }
+
+    objects = objects.filter(o => o.alive && sy(o.y) < PLAY_H + 40);
+
+    if (dist >= lv.baseY) completeLevel();
+  }
+
+  function steer(dt) {
+    const dir = (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
+    px = clamp(px + dir * CONFIG.steerSpeed * dt, 8, W - 8);
+  }
+
+  // =====================================================================
+  //  Drawing helpers
+  // =====================================================================
+  function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+  function sprite(rows, x, y, colors) {       // tiny pixel art from strings
+    rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) { const col = colors[row[c]]; if (col) rect(x + c, y + r, 1, 1, col); }
+    });
+  }
+  const FONT = {                               // 3x5 letters for the crate stencil
+    G: ['###', '#..', '#.#', '#.#', '###'], R: ['##.', '#.#', '##.', '#.#', '#.#'], U: ['#.#', '#.#', '#.#', '#.#', '###'],
+    B: ['##.', '#.#', '##.', '#.#', '##.'], S: ['###', '#..', '###', '..#', '###']
+  };
+  function stencil(text, x, y, col) {
+    [...text].forEach((ch, i) => sprite(FONT[ch], x + i * 4, y, { '#': col }));
+  }
+
+  // Rank insignia, 7 wide x 6 tall, used in the panel and (tiny) on Clooky's helmet
+  const INSIGNIA = [
+    { rows: ['.......', '.......', '##...##', '..###..', '.......', '.......'], c: '#FFD66B' },   // Private: one chevron
+    { rows: ['.......', '##...##', '..###..', '##...##', '..###..', '.......'], c: '#FFD66B' },   // Corporal: two chevrons
+    { rows: ['##...##', '..###..', '##...##', '..###..', '##...##', '..###..'], c: '#FFD66B' },   // Sergeant: three chevrons
+    { rows: ['.......', '.......', '#######', '#######', '.......', '.......'], c: '#FFD66B' },   // Lieutenant: gold bar
+    { rows: ['.......', '#######', '.......', '#######', '.......', '.......'], c: '#E6E9F0' },   // Captain: two silver bars
+    { rows: ['...#...', '..###..', '.#####.', '#######', '..###..', '...#...'], c: '#FFD66B' },   // Major: gold leaf
+    { rows: ['#.....#', '##.#.##', '.#####.', '..###..', '...#...', '..#.#..'], c: '#E6E9F0' },   // Colonel: eagle
+    { rows: ['...#...', '...#...', '#######', '.#####.', '..###..', '.##.##.'], c: '#FFD66B' }    // General: star
+  ];
+
+  // =====================================================================
+  //  Sprites
+  // =====================================================================
+  // Chicken colors. A future chicken picker only needs to add entries here and set `chicken`.
+  const CHICKENS = {
+    golden: { body: '#C98A55', wing: '#A86E3E', wingDark: '#7E4E28', wingEdge: '#E3B384', tail: '#8A5530' }
+  };
+  let chicken = 'golden';
+
+  // Captain Clooky, seen from above, flying up the river. (x, y) is her centre.
+  function drawClooky(x, y, opt = {}) {
+    const flap = Math.floor(clock * 10) % 2 === 0;
+    const wo = flap ? -1 : 1;
+    const C = CHICKENS[chicken];
+    const BODY = C.body, WING = C.wing, WING_D = C.wingDark, HELMET = '#5E7A3A', HELMET_D = '#44592A';
+    // Wings
+    rect(x - 10, y - 1 + wo, 20, 4, WING);
+    rect(x - 10, y + 2 + wo, 3, 2, WING_D); rect(x + 7, y + 2 + wo, 3, 2, WING_D);
+    rect(x - 10, y - 1 + wo, 20, 1, C.wingEdge);
+    // Blaster pods under the wings
+    rect(x - 7, y - 3 + wo, 2, 3, '#6B5B8C'); rect(x + 5, y - 3 + wo, 2, 3, '#6B5B8C');
+    // Body and tail
+    rect(x - 4, y - 4, 8, 10, BODY);
+    rect(x - 3, y - 6, 6, 13, BODY);
+    rect(x - 3, y + 7, 6, 2, C.tail); rect(x - 2, y + 9, 4, 2, WING_D);
+    // Head, helmet and goggles
+    rect(x - 3, y - 10, 6, 5, BODY);
+    rect(x - 4, y - 12, 8, 4, HELMET);
+    rect(x - 4, y - 9, 8, 1, HELMET_D);
+    rect(x - 3, y - 9, 2, 2, '#9BD8F0'); rect(x + 1, y - 9, 2, 2, '#9BD8F0');
+    rect(x - 1, y - 9, 2, 1, '#2E2E36');
+    rect(x - 2, y - 13, 1, 1, '#D62828'); rect(x, y - 13, 1, 1, '#D62828');   // comb peeking out
+    // Beak
+    rect(x - 1, y - 15, 2, 3, '#F2A33A');
+    // Tiny rank badge on the helmet
+    const ins = INSIGNIA[opt.rank != null ? opt.rank : rankIdx];
+    rect(x + 1, y - 12, 2, 2, ins.c);
+  }
+
+  function drawFox(x, y, dir) {
+    // Log raft
+    for (let i = 0; i < 3; i++) {
+      rect(x - 11, y - 4 + i * 3, 22, 3, i % 2 ? '#8A5A2B' : '#A8733A');
+      rect(x - 11, y - 4 + i * 3, 1, 3, '#5E3A1A'); rect(x + 10, y - 4 + i * 3, 1, 3, '#5E3A1A');
+    }
+    rect(x - 7, y - 5, 1, 10, '#5E3A1A'); rect(x + 6, y - 5, 1, 10, '#5E3A1A');
+    // Fox in a camo uniform
+    const f = dir;
+    rect(x - 4, y - 5, 8, 6, '#6B7A3A');            // camo coat
+    rect(x - 2, y - 4, 2, 2, '#4E5A2A'); rect(x + 1, y - 2, 2, 1, '#8A9A52');
+    rect(x - 7 * f - (f < 0 ? 5 : 0), y - 3, 6, 3, '#E07A2E');   // tail
+    rect(x - 7 * f - (f < 0 ? 5 : 0) + (f > 0 ? 0 : 4), y - 3, 2, 3, '#FFFFFF');
+    rect(x - 3, y - 11, 6, 6, '#E07A2E');            // head
+    rect(x - 3, y - 13, 2, 2, '#E07A2E'); rect(x + 1, y - 13, 2, 2, '#E07A2E');   // ears
+    rect(x - 1, y - 7, 2, 2, '#FFFFFF');             // muzzle
+    rect(x - 2, y - 9, 1, 1, '#1A1A1A'); rect(x + 1, y - 9, 1, 1, '#1A1A1A');
+    rect(x - 4, y - 12, 8, 2, '#4E5A2A');            // army helmet
+    rect(x - 3, y - 13, 6, 1, '#4E5A2A');
+  }
+
+  function drawHawk(x, y, dir) {
+    const flap = Math.floor(clock * 12) % 2 === 0;
+    const f = dir;   // direction it flies
+    const m = (dx, dy, w, h, c) => rect(f > 0 ? x + dx : x - dx - w, y + dy, w, h, c);
+    m(-7, -2, 12, 5, '#8A5A2B');                     // body
+    m(-10, -1, 4, 3, '#6E4420');                     // tail
+    if (flap) { m(-5, -8, 9, 5, '#6E4420'); m(-3, -9, 5, 1, '#D8B07A'); }
+    else { m(-5, 3, 9, 5, '#6E4420'); m(-3, 7, 5, 1, '#D8B07A'); }
+    m(4, -4, 5, 5, '#D8B07A');                       // head
+    m(4, -5, 5, 2, '#5A3A1A');                       // aviator cap
+    m(6, -3, 2, 2, '#9BD8F0');                       // goggles
+    m(9, -2, 2, 2, '#F2C230');                       // hooked beak
+    m(-2, -1, 4, 2, '#6B7A3A');                      // uniform scarf
+  }
+
+  function drawRaccoon(x, y) {
+    const prop = Math.floor(clock * 20) % 2 === 0;
+    // Little plane, nose pointing down toward Clooky
+    rect(x - 9, y - 3, 18, 4, '#C0392B');            // wings
+    rect(x - 9, y - 3, 18, 1, '#E05A4B');
+    rect(x - 2, y - 8, 4, 14, '#6B7A3A');            // fuselage
+    rect(x - 4, y - 8, 8, 2, '#C0392B');             // tail wing
+    rect(prop ? x - 4 : x - 1, y + 6, prop ? 8 : 2, 1, '#E6E9F0');   // spinning propeller
+    // Raccoon pilot
+    rect(x - 3, y - 4, 6, 5, '#8C8C94');
+    rect(x - 3, y - 3, 6, 1, '#2E2E36');             // bandit mask
+    rect(x - 2, y - 3, 1, 1, '#FFFFFF'); rect(x + 1, y - 3, 1, 1, '#FFFFFF');
+    rect(x - 3, y - 6, 6, 2, '#6B7A3A');             // cap
+    rect(x - 4, y - 5, 1, 2, '#8C8C94'); rect(x + 3, y - 5, 1, 2, '#8C8C94');   // ears
+  }
+
+  function drawCrate(x, y, drop) {
+    const up = Math.round(drop * 26);
+    const cy = y - up;
+    if (drop > 0) {
+      // Parachute
+      rect(x - 11, cy - 20, 22, 3, '#FFFFFF');
+      rect(x - 9, cy - 22, 18, 2, '#F08A4B');
+      rect(x - 6, cy - 23, 12, 1, '#F08A4B');
+      rect(x - 11, cy - 17, 4, 1, '#F08A4B'); rect(x + 7, cy - 17, 4, 1, '#F08A4B');
+      for (const dx of [-10, -3, 2, 9]) rect(x + dx, cy - 17, 1, 9, '#E6E0D0');
+      // Shadow on the water shows where it will land
+      ctx.globalAlpha = 0.25; rect(x - 10, y + 4, 20, 3, '#1A2A4A'); ctx.globalAlpha = 1;
+    } else {
+      rect(x - 13, y + 7, 26, 2, THEMES[0].streak);   // ripples
+    }
+    rect(x - 12, cy - 8, 24, 16, '#A8733A');
+    rect(x - 12, cy - 8, 24, 1, '#C9924F');
+    rect(x - 12, cy + 7, 24, 1, '#6E4420');
+    rect(x - 12, cy - 8, 1, 16, '#6E4420'); rect(x + 11, cy - 8, 1, 16, '#6E4420');
+    sprite(['..#..', '.###.', '#####', '.#.#.'], x - 2, cy - 6, { '#': '#FFF4E0' });   // star
+    stencil('GRUBS', x - 10, cy + 0, '#FFF4E0');
+  }
+
+  function drawMedic(x, y) {
+    rect(x - 7, y - 1, 14, 5, '#A8733A');            // small raft
+    rect(x - 7, y + 1, 14, 1, '#8A5A2B');
+    rect(x - 3, y - 6, 6, 6, '#FFE066');             // chick
+    rect(x - 2, y - 7, 4, 1, '#FFE066');
+    rect(x + 3, y - 4, 2, 1, '#F2A33A');             // beak
+    rect(x - 1, y - 5, 1, 1, '#1A1A1A');
+    rect(x - 3, y - 9, 6, 3, '#FFFFFF');             // medic helmet
+    rect(x - 1, y - 9, 2, 3, '#2FAF5A'); rect(x - 2, y - 8, 4, 1, '#2FAF5A');   // green plus
+    // Little flag with a heart
+    rect(x + 5, y - 11, 1, 10, '#6E4420');
+    sprite(['##.##', '#####', '.###.', '..#..'], x + 6, y - 11, { '#': '#FF6B8A' });
+  }
+
+  function drawWall(o) {
+    const s = sy(o.y);
+    const l = lv.bankL(o.y) - 2, r = lv.bankR(o.y) + 2;
+    for (let row = 0; row < 3; row++) {
+      const off = row % 2 ? 4 : 0;
+      for (let x = l - off; x < r; x += 8) {
+        const bx = Math.max(l, x), bw = Math.min(8, r - bx);
+        if (bw <= 0) continue;
+        rect(bx, s - 6 + row * 4, bw, 4, '#C8B07A');
+        rect(bx, s - 6 + row * 4, bw, 1, '#E2CFA0');
+        rect(bx + bw - 1, s - 6 + row * 4, 1, 4, '#8E7648');
+      }
+    }
+    rect(l, s + 6, r - l, 1, '#8E7648');
+  }
+
+  function drawBase() {
+    const y = sy(lv.baseY);
+    if (y < -40 || y > PLAY_H + 40) return;
+    // Bunting across the river marks the finish
+    const l = lv.bankL(lv.baseY), r = lv.bankR(lv.baseY);
+    rect(l - 4, y, r - l + 8, 1, '#221E4D');
+    const cols = ['#F08A4B', '#FFD66B', '#9B5CF6', '#2FAF5A'];
+    for (let x = l, i = 0; x < r; x += 8, i++) sprite(['###', '.#.'], x, y + 1, { '#': cols[i % 4] });
+    // Fort on the left bank
+    const fx = Math.max(4, l - 44);
+    rect(fx, y - 22, 36, 22, '#8A5A2B');
+    for (let i = 0; i < 36; i += 4) { rect(fx + i, y - 25, 3, 4, '#A8733A'); rect(fx + i + 3, y - 22, 1, 22, '#6E4420'); }
+    rect(fx + 13, y - 11, 10, 11, '#3A2410');         // gate
+    rect(fx + 17, y - 11, 1, 11, '#5E3A1A');
+    // Flag with an egg
+    rect(fx + 30, y - 40, 1, 18, '#E6E9F0');
+    rect(fx + 31, y - 40, 12, 8, '#F08A4B');
+    rect(fx + 35, y - 39, 4, 6, '#FFF4E0'); rect(fx + 36, y - 40, 2, 1, '#FFF4E0');
+    // Hangar on the right bank
+    const hx = Math.min(W - 40, r + 6);
+    rect(hx, y - 16, 34, 16, '#8C8C94');
+    rect(hx + 2, y - 20, 30, 4, '#A8A8B0');
+    rect(hx + 8, y - 12, 18, 12, '#3A3A44');
+  }
+
+  // Scenery on the riverbanks
+  const DECOR_SIZE = {
+    barn: [16, 14], hay: [8, 6], fence: [14, 5], tree: [10, 12], flowers: [8, 4],
+    jtree: [14, 14], palm: [11, 13], fern: [9, 6], vine: [3, 10],
+    cactus: [7, 11], rock: [9, 5], mesa: [14, 8], bones: [8, 3],
+    pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8]
+  };
+  function drawDecor(d) {
+    const y = sy(d.y);
+    if (y < -20 || y > PLAY_H + 20) return;
+    const x = d.x;
+    switch (d.type) {
+      case 'barn':
+        rect(x, y - 10, 16, 10, '#B83A2E'); rect(x + 1, y - 14, 14, 4, '#7A2A22'); rect(x + 3, y - 15, 10, 1, '#7A2A22');
+        rect(x + 5, y - 7, 6, 7, '#FFF4E0'); rect(x + 6, y - 6, 4, 6, '#B83A2E'); rect(x + 7, y - 6, 2, 6, '#FFF4E0'); break;
+      case 'hay':
+        rect(x, y - 5, 8, 5, '#E8C35A'); rect(x + 1, y - 6, 6, 1, '#E8C35A'); rect(x + 2, y - 4, 4, 1, '#C9A13A'); rect(x + 2, y - 2, 4, 1, '#C9A13A'); break;
+      case 'fence':
+        rect(x, y - 3, 14, 1, '#FFF4E0'); rect(x, y - 1, 14, 1, '#FFF4E0');
+        for (let i = 0; i < 14; i += 4) rect(x + i, y - 5, 1, 5, '#E6DCC4'); break;
+      case 'tree':
+        rect(x + 4, y - 4, 2, 4, '#6E4420'); rect(x, y - 12, 10, 8, '#2F8A3E'); rect(x + 1, y - 13, 8, 1, '#2F8A3E'); rect(x + 2, y - 11, 3, 2, '#46A854'); break;
+      case 'flowers':
+        rect(x, y - 2, 1, 1, '#FFD23F'); rect(x + 3, y - 3, 1, 1, '#FF8FB0'); rect(x + 6, y - 1, 1, 1, '#FFFFFF'); break;
+      case 'jtree':
+        rect(x + 6, y - 4, 2, 4, '#4A2E14'); rect(x, y - 14, 14, 10, '#1E5A24'); rect(x + 2, y - 13, 4, 3, '#2F7A33'); rect(x + 8, y - 10, 4, 3, '#3A8C3A'); break;
+      case 'palm':
+        rect(x + 5, y - 9, 1, 9, '#7A5A2A'); rect(x, y - 12, 11, 2, '#2F8A3E'); rect(x + 2, y - 13, 7, 1, '#46A854'); rect(x, y - 10, 2, 2, '#2F8A3E'); rect(x + 9, y - 10, 2, 2, '#2F8A3E'); break;
+      case 'fern':
+        rect(x, y - 3, 9, 2, '#3A8C3A'); rect(x + 2, y - 5, 5, 2, '#46A854'); rect(x + 4, y - 6, 1, 1, '#46A854'); break;
+      case 'vine': {
+        const side = d.side;
+        const edge = side < 0 ? lv.bankL(d.y) : lv.bankR(d.y);
+        const vx = side < 0 ? edge : edge - 2;
+        rect(vx, y - 10, 1, 10, '#2F8A3E'); rect(vx + 1, y - 6, 1, 6, '#46A854'); rect(vx, y - 1, 2, 1, '#6CC46A'); break;
+      }
+      case 'cactus':
+        rect(x + 3, y - 11, 2, 11, '#3E8E4A'); rect(x, y - 8, 1, 4, '#3E8E4A'); rect(x + 1, y - 5, 2, 1, '#3E8E4A');
+        rect(x + 6, y - 9, 1, 4, '#3E8E4A'); rect(x + 5, y - 6, 1, 1, '#3E8E4A'); break;
+      case 'rock':
+        rect(x, y - 4, 9, 4, '#A0704A'); rect(x + 1, y - 5, 6, 1, '#B8845A'); rect(x + 2, y - 3, 2, 1, '#C99A70'); break;
+      case 'mesa':
+        rect(x, y - 6, 14, 6, '#C0703A'); rect(x + 2, y - 8, 10, 2, '#D48A4E'); rect(x, y - 3, 14, 1, '#A85E26'); break;
+      case 'bones':
+        rect(x, y - 2, 8, 1, '#FFF4E0'); rect(x, y - 3, 1, 3, '#FFF4E0'); rect(x + 7, y - 3, 1, 3, '#FFF4E0'); break;
+      case 'pine':
+        rect(x + 4, y - 3, 1, 3, '#6E4420'); rect(x + 1, y - 7, 7, 4, '#2E6B4A'); rect(x + 2, y - 10, 5, 3, '#2E6B4A'); rect(x + 3, y - 13, 3, 3, '#2E6B4A');
+        rect(x + 2, y - 10, 5, 1, '#FFFFFF'); rect(x + 3, y - 13, 3, 1, '#FFFFFF'); rect(x + 1, y - 7, 7, 1, '#FFFFFF'); break;
+      case 'drift':
+        rect(x, y - 3, 12, 3, '#FFFFFF'); rect(x + 2, y - 5, 7, 2, '#FFFFFF'); rect(x + 1, y - 1, 10, 1, '#DCE9F3'); break;
+      case 'floe': {
+        const side = d.side;
+        const edge = side < 0 ? lv.bankL(d.y) : lv.bankR(d.y);
+        const fx = side < 0 ? edge + 1 : edge - 9;
+        rect(fx, y - 3, 8, 3, '#FFFFFF'); rect(fx + 1, y, 6, 1, '#BFD9EA'); break;
+      }
+      case 'igloo':
+        rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
+        rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
+    }
+  }
+
+  // =====================================================================
+  //  Draw
+  // =====================================================================
+  function drawRiver() {
+    const T = lv.theme;
+    rect(0, 0, W, PLAY_H, T.water);
+    const r0 = Math.floor((dist - (PLAY_H - PLAYER_Y) - ROW) / ROW);   // may be negative near the start
+    const r1 = Math.min(lv.rows - 1, Math.ceil((dist + PLAYER_Y + ROW) / ROW));
+    for (let r = r0; r <= r1; r++) {
+      const rc = Math.max(0, r);                   // below the start line, reuse the first row
+      const top = Math.round(sy((r + 1) * ROW)), l = lv.L[rc], rr = lv.R[rc];
+      // Water sparkle streaks
+      if (((r + 1000) * 37) % 9 === 0) rect(l + (((r + 1000) * 53) % Math.max(1, rr - l - 8)) + 2, top + 1, 6, 1, T.streak);
+      // Banks
+      rect(0, top, l, ROW, T.land);
+      rect(rr, top, W - rr, ROW, T.land);
+      const k = r + 1000;                          // keep the texture pattern positive below the start line
+      if ((k * 13) % 5 === 0) { rect((k * 29) % Math.max(1, l - 2), top + 1, 2, 1, T.landDot); rect(rr + 2 + (k * 31) % Math.max(1, W - rr - 4), top + 2, 2, 1, T.landDot); }
+      rect(l - T.shoreW, top, T.shoreW, ROW, T.shore);
+      rect(rr, top, T.shoreW, ROW, T.shore);
+    }
+  }
+
+  function drawPanel() {
+    rect(0, PLAY_H, W, PANEL_H, '#221E4D');
+    rect(0, PLAY_H, W, 1, '#3A3470');
+    // Lives: little helmeted chicken heads
+    for (let i = 0; i < CONFIG.lives.max; i++) {
+      const x = 6 + i * 11, y = PLAY_H + 6;
+      if (i < lives) {
+        rect(x, y + 2, 8, 6, CHICKENS[chicken].body); rect(x, y, 8, 3, '#5E7A3A'); rect(x + 1, y + 3, 2, 1, '#9BD8F0'); rect(x + 5, y + 3, 2, 1, '#9BD8F0');
+        rect(x + 3, y + 5, 2, 2, '#F2A33A');
+      } else {
+        rect(x + 2, y + 3, 4, 3, '#3A3470');
+      }
+    }
+    // Feed meter with a corn cob icon
+    const mx = 76, my = PLAY_H + 6, mw = 100;
+    sprite(['.#.', '###', '###', '###', '###', '.#.', '#.#'], mx - 8, my - 1, { '#': '#FFD23F' });
+    const low = feed < CONFIG.feed.lowWarning;
+    const blinkOff = low && Math.floor(clock * 4) % 2 === 0;
+    rect(mx - 1, my - 1, mw + 2, 10, blinkOff ? '#FF6B6B' : '#FFF4E0');
+    rect(mx, my, mw, 8, '#221E4D');
+    const col = feed > 0.5 ? '#6CC46A' : feed > CONFIG.feed.lowWarning ? '#FFD23F' : '#FF6B6B';
+    if (!blinkOff) rect(mx, my, Math.round(mw * clamp(feed, 0, 1)), 8, col);
+    rect(mx + mw / 2, my, 1, 8, '#3A3470');
+    if (refilling) rect(mx + Math.round(mw * feed) - 1, my - 2, 2, 12, '#FFFFFF');
+    // Rank badge
+    const ins = INSIGNIA[rankIdx];
+    rect(W - 26, PLAY_H + 4, 20, 13, '#3A3470');
+    rect(W - 26, PLAY_H + 4, 20, 1, '#5B5299');
+    sprite(ins.rows, W - 19, PLAY_H + 7, { '#': ins.c });
+  }
+
+  function draw() {
+    if (!lv) {   // title screen before the first game
+      lv = buildLevel(1);
+      spawnObjectsFrom(0);
+    }
+    drawRiver();
+    for (const d of lv.decor) drawDecor(d);
+    drawBase();
+    for (const o of objects) {
+      if (!o.alive) continue;
+      const y = sy(o.y);
+      if (y < -40 || y > PLAY_H + 40) continue;
+      if (o.type === 'wall') drawWall(o);
+      else if (o.type === 'fox') drawFox(o.x, y, o.dir);
+      else if (o.type === 'medic') drawMedic(o.x + (o.wobble > 0 ? Math.round(Math.sin(clock * 40)) : 0), y);
+      else if (o.type === 'crate' && o.landed) drawCrate(o.x, y, 0);
+    }
+    // Lasers
+    for (const l of lasers) {
+      const y = sy(l.wy);
+      rect(l.x - 1, y - 4, 2, 7, '#9B5CF6'); rect(l.x, y - 5, 1, 9, '#E0CCFF');
+    }
+    // Clooky
+    const showPlayer = state !== 'dying' && state !== 'title' && !(invulnT > 0 && Math.floor(clock * 12) % 2 === 0);
+    if (showPlayer) drawClooky(Math.round(px), PLAYER_Y);
+    // Things in the air
+    for (const o of objects) {
+      if (!o.alive) continue;
+      const y = sy(o.y);
+      if (y < -40 || y > PLAY_H + 40) continue;
+      if (o.type === 'raccoon') drawRaccoon(o.x, y);
+      else if (o.type === 'hawk') drawHawk(o.x, y, -o.side);
+      else if (o.type === 'crate' && !o.landed) drawCrate(o.x, y, o.drop);
+    }
+    // Smoke and feathers
+    for (const p of particles) {
+      const y = sy(p.wy);
+      ctx.globalAlpha = clamp(p.life * 1.6, 0, 1);
+      if (p.kind === 'smoke') { const s = Math.round(p.size); rect(p.x - s / 2, y - s / 2, s, s, '#E6E6EE'); rect(p.x - s / 2 + 1, y - s / 2 + 1, s - 2, s - 2, '#FFFFFF'); }
+      else rect(p.x, y, 2, 1, p.color);
+    }
+    ctx.globalAlpha = 1;
+    drawPanel();
+  }
+
+  // Title screen sprite (drawn once into its own little canvas)
+  (function drawTitleSprite() {
+    const tc = $('titleSprite').getContext('2d');
+    const saved = ctx;
+    ctx = tc; ctx.imageSmoothingEnabled = false;
+    drawClooky(16, 17, { rank: 0 });
+    ctx = saved;
+  })();
+
+  // =====================================================================
+  //  Loop
+  // =====================================================================
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    pollGamepad();
+    if (state !== 'paused' && state !== 'title' && state !== 'over') update(dt);
+    else clock += dt;
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // =====================================================================
+  //  Buttons and test mode
+  // =====================================================================
+  $('playBtn').addEventListener('click', newGame);
+  $('continueBtn').addEventListener('click', continueGame);
+  $('titleBtn').addEventListener('click', backToTitle);
+  $('nextBtn').addEventListener('click', nextLevel);
+  $('resumeBtn').addEventListener('click', togglePause);
+  titleScreen.addEventListener('pointerdown', e => { if (e.target === titleScreen) { e.preventDefault(); newGame(); } });
+
+  // Open the game with ?dev=1 to show the test buttons; this browser remembers it until ?dev=0.
+  const DEV_KEY = 'captainClookyDev';
+  let devMode = false;
+  try {
+    const dev = new URLSearchParams(location.search).get('dev');
+    if (dev === '1') localStorage.setItem(DEV_KEY, '1');
+    if (dev === '0') localStorage.removeItem(DEV_KEY);
+    devMode = localStorage.getItem(DEV_KEY) === '1';
+  } catch (e) {
+    devMode = new URLSearchParams(location.search).get('dev') === '1';
+  }
+  $('skipBtn').hidden = !devMode;
+  $('feedBtn').hidden = !devMode;
+  $('skipBtn').addEventListener('click', () => {
+    ensureAudio();
+    if (state === 'title' || state === 'over') newGame();
+    if (state === 'playing' || state === 'intro') { banner.hidden = true; completeLevel(); }
+  });
+  $('feedBtn').addEventListener('click', () => { feed = 1; });
+})();
+</script>
+</body>
+</html>
