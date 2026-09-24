@@ -231,7 +231,7 @@
     <div class="overlay" id="titleScreen">
       <h1>Captain Clooky</h1>
       <canvas class="title-sprite" id="titleSprite" width="32" height="32" aria-hidden="true"></canvas>
-      <p>Fly Captain Clooky up the river! Zap the fox rafts, swooping hawks and pouncing raccoons with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
+      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks, raccoons, anacondas and the big eagle with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
       <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
       <p id="titleBest">Best 0 · Private</p>
       <button class="play" id="playBtn" type="button">Play</button>
@@ -291,7 +291,7 @@
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
-      fox: 30, hawk: 100, raccoon: 60, crate: 20, medic: -100, wall: 50,
+      fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, crate: 20, medic: -100, wall: 50,
       levelBonus: 500, feedBonusMax: 250
     },
     level: {
@@ -319,13 +319,17 @@
       maxWidth: Math.max(92, 196 - d * 9),        // widest river
       drift: Math.min(2.6, 1.1 + d * 0.22),       // how quickly the river bends (pixels per row)
       enemySpeed: Math.min(2.4, 1 + d * 0.13),
-      enemiesPerSection: Math.min(20, 8 + d * 2),
-      crateGap: Math.min(440, 240 + d * 32),      // distance between GRUBS crates
+      enemiesPerSection: Math.min(24, 10 + d * 2),
+      islandGap: Math.max(240, 600 - d * 60),      // distance between islands (smaller = more islands)
+      islandMax: Math.min(84, 48 + d * 6),         // widest an island gets
+      crateGap: Math.min(400, 230 + d * 28),      // distance between GRUBS crates
       medicsPerSection: d === 0 ? 1 : 2,
       weights: {                                   // which enemies show up
         fox: Math.max(2, 3.5 - d * 0.3),
         raccoon: 3 + Math.min(2, d * 0.5),
-        hawk: 2 + Math.min(2.5, d * 0.6)
+        hawk: 2 + Math.min(2.5, d * 0.6),
+        anaconda: 1.6 + Math.min(1.8, d * 0.4),
+        eagle: 1 + Math.min(1.5, d * 0.4)
       }
     };
   }
@@ -333,16 +337,16 @@
   const THEMES = [
     { key: 'farm',   name: 'Farm River',
       water: '#3C82D2', streak: '#6FA8E6', land: '#5DAE4A', landDot: '#4C9A3C', shore: '#D9C27A', shoreW: 2,
-      decor: ['barn', 'hay', 'hay', 'fence', 'fence', 'tree', 'tree', 'flowers'] },
+      decor: ['barn', 'hay', 'hay', 'fence', 'fence', 'tree', 'tree', 'flowers'], island: ['tree', 'hay'] },
     { key: 'jungle', name: 'Jungle River',
       water: '#2E8A7E', streak: '#57B3A5', land: '#2F7A33', landDot: '#245F28', shore: '#5A4A2A', shoreW: 2,
-      decor: ['jtree', 'jtree', 'jtree', 'jtree', 'palm', 'palm', 'fern', 'vine', 'vine'], density: 2.2 },
+      decor: ['jtree', 'jtree', 'jtree', 'jtree', 'palm', 'palm', 'fern', 'vine', 'vine'], density: 2.2, island: ['jtree', 'palm'] },
     { key: 'desert', name: 'Desert Canyon',
       water: '#3E8FC0', streak: '#77B8DE', land: '#E0A060', landDot: '#CC8A48', shore: '#A85E26', shoreW: 4,
-      decor: ['cactus', 'cactus', 'rock', 'rock', 'mesa', 'bones'] },
+      decor: ['cactus', 'cactus', 'rock', 'rock', 'mesa', 'bones'], island: ['cactus', 'rock'] },
     { key: 'ice',    name: 'Icy River',
       water: '#4F9FD6', streak: '#BFE3F7', land: '#F4F8FC', landDot: '#DCE9F3', shore: '#BFD9EA', shoreW: 3,
-      decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'] }
+      decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'], island: ['pine', 'drift'] }
   ];
   const themeFor = level => THEMES[(level - 1) % THEMES.length];
 
@@ -412,13 +416,17 @@
     o.connect(g).connect(audio.destination);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  function noise(dur, vol = 0.1, f0 = 2000, f1 = 300, delay = 0, type = 'bandpass') {
-    if (!audio || !soundOn) return;
+  function getNoise() {
     if (!noiseBuf) {
-      noiseBuf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+      noiseBuf = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
+    return noiseBuf;
+  }
+  function noise(dur, vol = 0.1, f0 = 2000, f1 = 300, delay = 0, type = 'bandpass') {
+    if (!audio || !soundOn) return;
+    getNoise();
     const t = audio.currentTime + delay;
     const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
     src.buffer = noiseBuf;
@@ -455,10 +463,38 @@
     lifeUp()   { [659, 880, 1175].forEach((f, i) => tone(f, 0.1, 'square', 0.05, 0, i * 0.08)); },
     promote()  { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.3 : 0.1, 'square', 0.05, 0, i * 0.1)); },
     levelDone(){ [523, 587, 659, 784, 880, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.09)); tone(1047, 0.4, 'triangle', 0.06, 0, 0.6); },
+    hiss()     { noise(0.45, 0.07, 5000, 3000, 0, 'highpass'); },
+    screech()  { tone(1800, 0.35, 'sawtooth', 0.04, -900); tone(2200, 0.25, 'square', 0.02, -1200, 0.05); },
     chitter()  { [1400, 1700, 1300].forEach((f, i) => tone(f, 0.04, 'square', 0.03, 0, i * 0.05)); },
     splash()   { noise(0.3, 0.08, 2600, 500); },
     start()    { tone(523, 0.08, 'square', 0.05); tone(659, 0.08, 'square', 0.05, 0, 0.09); tone(784, 0.12, 'square', 0.05, 0, 0.18); }
   };
+
+  // Flying sound: a soft rush of wind plus a low hum; both rise with speed and fade out when not flying
+  let wind = null;
+  function updateWind() {
+    if (!audio) return;
+    const flying = soundOn && (state === 'playing' || state === 'intro');
+    if (flying && !wind) {
+      const src = audio.createBufferSource(); src.buffer = getNoise(); src.loop = true;
+      const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; lp.Q.value = 0.8;
+      const hum = audio.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = 70;
+      const humF = audio.createBiquadFilter(); humF.type = 'lowpass'; humF.frequency.value = 240;
+      const humG = audio.createGain(); humG.gain.value = 0.35;
+      const g = audio.createGain(); g.gain.value = 0;
+      src.connect(lp).connect(g);
+      hum.connect(humF).connect(humG).connect(g);
+      g.connect(audio.destination);
+      src.start(); hum.start();
+      wind = { g, lp, hum };
+    }
+    if (!wind) return;
+    const S = CONFIG.speed, t = audio.currentTime;
+    const k = clamp(((state === 'playing' ? speedNow : S.normal) - S.slow) / (S.fast - S.slow), 0, 1);
+    wind.g.gain.setTargetAtTime(flying ? 0.035 + 0.045 * k : 0, t, 0.12);
+    wind.lp.frequency.setTargetAtTime(380 + 900 * k, t, 0.15);
+    wind.hum.frequency.setTargetAtTime(58 + 40 * k, t, 0.15);
+  }
 
   soundBtn.addEventListener('click', () => {
     soundOn = !soundOn;
@@ -481,7 +517,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   const HIT = {                    // hit boxes (width, height), centred on the object
-    fox: [20, 10], hawk: [18, 10], raccoon: [14, 12], crate: [24, 16], medic: [14, 10]
+    fox: [20, 10], hawk: [18, 10], raccoon: [14, 12], anaconda: [12, 12], eagle: [22, 12], crate: [24, 16], medic: [14, 10]
   };
   const REFILL_ZONE = [24, 30];    // flying through this area around a crate refills feed
 
@@ -494,6 +530,20 @@
     const baseY = startLength + sections * sectionLength;
     const rows = Math.ceil((baseY + 400) / ROW);
     const L = new Int16Array(rows), R = new Int16Array(rows);
+    const IL = new Int16Array(rows), IR = new Int16Array(rows);   // island edges (equal = no island)
+    const CHANNEL = 42;                                            // each side of an island stays at least this wide
+
+    // Islands: stretches (in rows) where the river widens and splits around land
+    const islands = [];
+    for (let y = startLength + 240; y < baseY - 300;) {
+      y += D.islandGap * (0.7 + rng() * 0.6);
+      const len = 150 + rng() * 180;
+      if (y + len > baseY - 260) break;
+      if (wallYs.some(wy => y < wy + 120 && y + len > wy - 230)) continue;
+      islands.push([Math.floor(y / ROW), Math.floor((y + len) / ROW)]);
+      y += len;
+    }
+    const islandSoon = r => islands.some(([a, b]) => r >= a - 55 && r <= b);
 
     // River banks: wander toward random targets, never bending faster than the difficulty allows,
     // so there is always a smooth, passable channel.
@@ -504,6 +554,7 @@
       if (y < startLength + 60) { tc = W / 2; tw = D.maxWidth; }
       else if (y > baseY - 180) { tc = W / 2; tw = 172; }
       else if (nearWall) { tc = c; tw = 104; }
+      else if (islandSoon(r)) { tc = W / 2; tw = 204; }
       else if (r >= nextBend) {
         tw = D.minWidth + rng() * (D.maxWidth - D.minWidth);
         const half = tw / 2 + 12;
@@ -515,20 +566,52 @@
       L[r] = clamp(Math.round(c - w / 2), 8, W - 60);
       R[r] = clamp(Math.round(c + w / 2), L[r] + 52, W - 8);
     }
+    // Shape each island like a lens, never squeezing either channel below CHANNEL
+    for (const [a, b] of islands) {
+      for (let r = a; r <= b; r++) {
+        const u = (r - a) / (b - a);
+        const iw = Math.min(D.islandMax, R[r] - L[r] - 2 * CHANNEL) * Math.sin(Math.PI * u);
+        if (iw < 8) continue;
+        const cc = (L[r] + R[r]) / 2;
+        IL[r] = Math.round(cc - iw / 2); IR[r] = Math.round(cc + iw / 2);
+      }
+    }
     const rowOf = y => clamp(Math.floor(y / ROW), 0, rows - 1);
     const bankL = y => L[rowOf(y)], bankR = y => R[rowOf(y)];
+    const hasIsland = r => IR[r] > IL[r];
+    // Is (x, y) open water, at least `m` pixels from any land?
+    const isWater = (y, x, m = 0) => {
+      const r = rowOf(y);
+      if (x - m < L[r] || x + m > R[r]) return false;
+      return !(hasIsland(r) && x + m > IL[r] && x - m < IR[r]);
+    };
+    // The stretch of water at row y that x is in (or nearest to): [left edge, right edge]
+    const channel = (y, x) => {
+      const r = rowOf(y);
+      if (!hasIsland(r)) return [L[r], R[r]];
+      return x < (IL[r] + IR[r]) / 2 ? [L[r], IL[r]] : [IR[r], R[r]];
+    };
+    // Middle of the widest water at row y (where Clooky starts or respawns)
+    const safeX = y => {
+      const r = rowOf(y);
+      if (!hasIsland(r)) return (L[r] + R[r]) / 2;
+      return IL[r] - L[r] >= R[r] - IR[r] ? (L[r] + IL[r]) / 2 : (IR[r] + R[r]) / 2;
+    };
     // A spot on the water that stays clear of the banks for a stretch above and below,
     // so reaching it never means hugging a bending shore.
     const waterX = (y, margin) => {
-      let l = 0, rr = W;
-      for (let yy = y - 40; yy <= y + 40; yy += ROW) { l = Math.max(l, bankL(yy)); rr = Math.min(rr, bankR(yy)); }
-      l += margin; rr -= margin;
-      return rr > l ? l + rng() * (rr - l) : (bankL(y) + bankR(y)) / 2;
+      for (let tries = 0; tries < 30; tries++) {
+        const x = bankL(y) + margin + rng() * Math.max(0, bankR(y) - bankL(y) - 2 * margin);
+        let ok = true;
+        for (let yy = y - 40; yy <= y + 40 && ok; yy += ROW) ok = isWater(yy, x, margin);
+        if (ok) return x;
+      }
+      return safeX(y);
     };
     const tooCloseToWall = y => wallYs.some(wy => Math.abs(y - wy) < 70) || y > baseY - 120;
 
     // Objects (the plan is never changed; each life copies the part still ahead)
-    const plan = [];
+    const plan = [], trees = [];
     for (let s = 0; s < sections; s++) {
       const s0 = startLength + s * sectionLength, s1 = s0 + sectionLength;
       const used = [];
@@ -536,19 +619,37 @@
 
       // GRUBS crates, evenly spaced so feed never runs out on a careful run
       for (let y = s0 + D.crateGap * 0.55; y < s1 - 40; y += D.crateGap * (0.85 + rng() * 0.3)) {
-        if (tooCloseToWall(y)) continue;
+        // Keep crates out of island stretches, so picking either channel never means missing feed
+        const isl = islands.find(([a, b]) => y > a * ROW - 60 && y < b * ROW + 60);
+        if (isl) y = isl[1] * ROW + 60;
+        if (y >= s1 - 40 || tooCloseToWall(y)) continue;
         plan.push({ type: 'crate', x: waterX(y, 20), y }); used.push(y);
       }
       // Enemies, spread through the section
-      const total = D.weights.fox + D.weights.raccoon + D.weights.hawk;
+      const types = Object.keys(D.weights);
+      const total = types.reduce((sum, k) => sum + D.weights[k], 0);
       for (let i = 0; i < D.enemiesPerSection; i++) {
         let y = s0 + 90 + (i + 0.2 + rng() * 0.6) * ((sectionLength - 150) / D.enemiesPerSection);
         let tries = 0;
         while (!free(y) && tries++ < 6) y += 28;
         if (!free(y)) continue;
-        const pick = rng() * total;
-        const type = pick < D.weights.fox ? 'fox' : pick < D.weights.fox + D.weights.raccoon ? 'raccoon' : 'hawk';
+        let pick = rng() * total, type = types[0];
+        for (const k of types) { if (pick < D.weights[k]) { type = k; break; } pick -= D.weights[k]; }
+        if (type === 'eagle') {
+          // Perch on a tall redwood; pick the bank with room for the tree, or fall back to a hawk
+          const room = side => { let m = W; for (let yy = y - 4; yy <= y + 40; yy += ROW) m = Math.min(m, side < 0 ? bankL(yy) : W - bankR(yy)); return m; };
+          const side = room(-1) >= room(1) ? -1 : 1;
+          if (room(side) >= 22) {
+            const tx = side < 0 ? Math.round(room(side) / 2) : W - Math.round(room(side) / 2);
+            trees.push({ type: 'redwood', side, x: tx - 7, y });
+            plan.push({ type, x: tx, y: y + 34, side });
+            used.push(y);
+            continue;
+          }
+          type = 'hawk';
+        }
         if (type === 'hawk') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
+        else if (type === 'anaconda') plan.push({ type, x: waterX(y, 16), y });
         else if (type === 'raccoon') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
         else plan.push({ type, x: waterX(y, 14), y, dir: rng() < 0.5 ? -1 : 1 });
         used.push(y);
@@ -561,12 +662,25 @@
         plan.push({ type: 'medic', x: waterX(y, 12), y }); used.push(y);
       }
     }
+    // A crate just before every island: fill up, then pick a channel
+    for (const [a] of islands) {
+      const y = a * ROW - 90;
+      if (!tooCloseToWall(y) && !plan.some(p => p.type === 'crate' && Math.abs(p.y - y) < 60)) {
+        for (let i = plan.length - 1; i >= 0; i--) {
+          const o = plan[i];
+          if (o.type === 'crate' || Math.abs(o.y - y) >= 26) continue;
+          if (o.type === 'eagle') { const t = trees.findIndex(tr => tr.y === o.y - 34); if (t >= 0) trees.splice(t, 1); }
+          plan.splice(i, 1);
+        }
+        plan.push({ type: 'crate', x: waterX(y, 20), y });
+      }
+    }
     for (const y of wallYs) plan.push({ type: 'wall', x: 0, y });
     plan.sort((a, b) => a.y - b.y);
 
     // Scenery on the banks (checked so it never pokes into the water)
     const theme = themeFor(level);
-    const decor = [];
+    const decor = trees.slice();   // eagle redwoods first, then random scenery
     const density = theme.density || 1;
     for (let y = 10; y < baseY + 300; y += (14 + rng() * 22) / density) {
       for (const side of [-1, 1]) {
@@ -578,15 +692,27 @@
           continue;
         }
         let edge = side < 0 ? W : 0;
-        for (let yy = y - dh; yy <= y + 2; yy += ROW) edge = side < 0 ? Math.min(edge, bankL(yy)) : Math.max(edge, bankR(yy));
+        for (let yy = y - 2; yy <= y + dh; yy += ROW) edge = side < 0 ? Math.min(edge, bankL(yy)) : Math.max(edge, bankR(yy));   // sprites grow up the screen (further up the river)
         const room = side < 0 ? edge - 6 - dw : W - edge - 6 - dw;
         if (room < 2) continue;
         const x = side < 0 ? 2 + rng() * room : edge + 4 + rng() * room;
         if (Math.abs(y - baseY) < 40) continue;
+        if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
         decor.push({ type, side, y, x: Math.round(x) });
       }
     }
-    return { level, L, R, rows, bankL, bankR, wallYs, baseY, plan, decor, theme };
+    // A little scenery on the islands too
+    for (const [a, b] of islands) {
+      for (let r = a + 6; r < b - 4; r += 7 + Math.floor(rng() * 5)) {
+        const type = theme.island[Math.floor(rng() * theme.island.length)];
+        const [dw, dh] = DECOR_SIZE[type];
+        let l = -1, rr = W + 1;
+        for (let k = r; k <= r + Math.ceil(dh / ROW); k++) { if (!hasIsland(k)) { l = W; break; } l = Math.max(l, IL[k]); rr = Math.min(rr, IR[k]); }
+        if (rr - l < dw + 6) continue;
+        decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2) });
+      }
+    }
+    return { level, L, R, IL, IR, rows, bankL, bankR, isWater, channel, safeX, wallYs, baseY, plan, decor, theme };
   }
 
   // =====================================================================
@@ -654,6 +780,8 @@
       const o = { ...p, alive: true, t: 0 };
       if (o.type === 'crate') { o.drop = 1; o.landed = false; }
       if (o.type === 'hawk') { o.active = false; o.x = o.side < 0 ? 8 : W - 8; }
+      if (o.type === 'anaconda') { o.phase = 'lurk'; o.k = 0; o.baseX = o.x; o.headX = o.x; }
+      if (o.type === 'eagle') { o.phase = 'perch'; o.cx = o.x; }
       if (o.type === 'raccoon') {
         o.phase = 'wait'; o.hop = 0;
         o.x = o.side < 0 ? Math.max(7, lv.bankL(o.y) - 9) : Math.min(W - 7, lv.bankR(o.y) + 9);
@@ -675,7 +803,7 @@
 
   function placePlayer(y) {
     dist = y;
-    px = (lv.bankL(dist) + lv.bankR(dist)) / 2;
+    px = lv.safeX(dist);
     feed = 1;
     lasers = []; jamT = 0; fireCooldown = 0;
     spawnObjectsFrom(dist);
@@ -878,6 +1006,9 @@
   // =====================================================================
   //  Update
   // =====================================================================
+  // Where an object's body really is (a rearing anaconda's head is a little further up the river)
+  const hitY = o => o.type === 'anaconda' ? o.y + 12 * o.k : o.y;
+
   function boxHit(ax, ay, aw, ah, bx, by, bw, bh) {
     return Math.abs(ax - bx) * 2 < aw + bw && Math.abs(ay - by) * 2 < ah + bh;
   }
@@ -912,8 +1043,10 @@
     sfx.zap();
     const fur = o.type === 'fox' ? ['#E07A2E', '#FFFFFF', '#5B6B2E']
       : o.type === 'hawk' ? ['#8A5A2B', '#D8B07A', '#FFFFFF']
-      : o.type === 'raccoon' ? ['#8C8C94', '#2E2E36', '#6B7A3A'] : ['#A8733A', '#C9924F', '#FFFFFF'];
-    puff(o.x, o.y, 8, false, fur);
+      : o.type === 'raccoon' ? ['#8C8C94', '#2E2E36', '#6B7A3A']
+      : o.type === 'anaconda' ? ['#3E8E4A', '#2E5A2A', '#E6D36A']
+      : o.type === 'eagle' ? ['#5A3A1A', '#FFFFFF', '#F2C230'] : ['#A8733A', '#C9924F', '#FFFFFF'];
+    puff(o.x, hitY(o), 8, false, fur);
   }
 
   function update(dt) {
@@ -982,14 +1115,16 @@
       const onScreen = sy(o.y) > -24;
       if (o.type === 'fox' && onScreen) {
         o.x += o.dir * 14 * D.enemySpeed * dt;
-        const l = lv.bankL(o.y) + 12, r = lv.bankR(o.y) - 12;
+        const [cl, cr] = lv.channel(o.y, o.x);
+        const l = cl + 12, r = cr - 12;
         if (o.x < l) { o.x = l; o.dir = 1; }
         if (o.x > r) { o.x = r; o.dir = -1; }
       } else if (o.type === 'raccoon') {
         const ahead = o.y - dist;
         if (o.phase === 'wait' && ahead < 95 && ahead > 20) {
           o.phase = 'jump'; o.jt = 0; o.fromX = o.x;
-          o.toX = clamp(px, lv.bankL(o.y) + 10, lv.bankR(o.y) - 10);
+          const [cl, cr] = lv.channel(o.y, px);
+          o.toX = clamp(px, cl + 10, cr - 10);
           sfx.chitter();
         }
         if (o.phase === 'jump') {
@@ -1004,12 +1139,39 @@
         } else if (o.phase === 'swim') {
           const dx = px - o.x;
           o.x += Math.sign(dx) * Math.min(Math.abs(dx), 9 * D.enemySpeed * dt);
-          o.x = clamp(o.x, lv.bankL(o.y) + 8, lv.bankR(o.y) - 8);
+          const [cl, cr] = lv.channel(o.y, o.x);
+          o.x = clamp(o.x, cl + 8, cr - 8);
         }
       } else if (o.type === 'hawk') {
         if (!o.active && o.y - dist < 125) { o.active = true; buk(900, 1300, 0.12, 0, 0.06); }
         if (o.active) o.x -= o.side * 110 * D.enemySpeed * dt;
         if (o.active && (o.x < -30 || o.x > W + 30)) o.alive = false;
+      } else if (o.type === 'anaconda') {
+        // Lurks as a shadow under the water, then rears up and lunges toward Clooky, then sinks again
+        const ahead = o.y - dist;
+        if (o.phase === 'lurk' && ahead < 80 && ahead > 10) {
+          const [cl, cr] = lv.channel(o.y, o.baseX);
+          o.phase = 'rise'; o.target = clamp(px, cl + 10, cr - 10);
+          sfx.hiss();
+        }
+        if (o.phase === 'rise') {
+          o.k = Math.min(1, o.k + dt * 1.8 * Math.sqrt(D.enemySpeed));
+          if (o.k >= 1) { o.phase = 'up'; o.hold = 0.9; }
+        } else if (o.phase === 'up') {
+          o.hold -= dt; if (o.hold <= 0) o.phase = 'sink';
+        } else if (o.phase === 'sink') {
+          o.k = Math.max(0, o.k - dt * 1.5); if (o.k <= 0) o.phase = 'gone';
+        }
+        o.headX = o.baseX + ((o.target != null ? o.target : o.baseX) - o.baseX) * o.k;
+        o.x = o.headX;
+      } else if (o.type === 'eagle') {
+        // Waits on top of a redwood, then dives down the river in a zigzag toward Clooky
+        if (o.phase === 'perch' && o.y - dist < 150) { o.phase = 'dive'; o.t = 0; sfx.screech(); }
+        if (o.phase === 'dive') {
+          o.y -= 42 * D.enemySpeed * dt;
+          o.cx += clamp(px - o.cx, -38 * dt, 38 * dt);
+          o.x = clamp(o.cx + Math.sin(o.t * 5) * 24, 10, W - 10);
+        }
       } else if (o.type === 'medic' && o.wobble > 0) {
         o.wobble -= dt;
       } else if (o.type === 'crate' && onScreen && !o.landed) {
@@ -1027,8 +1189,9 @@
           continue;
         }
         if (o.type === 'crate' && !o.landed) continue;
+        if (o.type === 'anaconda' && o.k < 0.3) continue;
         const [bw, bh] = HIT[o.type];
-        if (boxHit(l.x, l.wy, 2, CONFIG.laser.length, o.x, o.y, bw, bh)) { l.used = true; hitObject(o); }
+        if (boxHit(l.x, l.wy, 2, CONFIG.laser.length, o.x, hitY(o), bw, bh)) { l.used = true; hitObject(o); }
       }
     }
     lasers = lasers.filter(l => !l.used);
@@ -1042,8 +1205,9 @@
         continue;
       }
       if (o.type === 'crate' && !o.landed) continue;
+      if (o.type === 'anaconda' && o.k < 0.4) continue;
       const [bw, bh] = o.type === 'crate' ? REFILL_ZONE : HIT[o.type];
-      if (!boxHit(px, dist, 12, 10, o.x, o.y, bw, bh)) continue;
+      if (!boxHit(px, dist, 12, 10, o.x, hitY(o), bw, bh)) continue;
       if (o.type === 'crate') refilling = true;
       else if (o.type === 'medic') { /* safe */ }
       else if (invulnT <= 0) { die('enemy'); return; }
@@ -1054,13 +1218,12 @@
       if (refillBeepT <= 0) { sfx.refill(feed); refillBeepT = 0.1; }
     }
 
-    // Riverbanks
-    const half = 5;
+    // Riverbanks and islands
     for (let yy = dist - 5; yy <= dist + 5; yy += ROW) {
-      if (px - half < lv.bankL(yy) || px + half > lv.bankR(yy)) { die('bank'); return; }
+      if (!lv.isWater(yy, px, 5)) { die('bank'); return; }
     }
 
-    objects = objects.filter(o => o.alive && sy(o.y) < PLAY_H + 40);
+    objects = objects.filter(o => o.alive && o.phase !== 'gone' && sy(o.y) < PLAY_H + 40);
 
     if (dist >= lv.baseY) completeLevel();
   }
@@ -1225,6 +1388,63 @@
     m(7, yy - 6, 3, 2, LIGHT); m(9, yy - 6, 1, 1, '#1A1A1A');
   }
 
+  // Anaconda in a little helmet: a shadow under the water, then it rears up and lunges
+  function drawAnaconda(o, y) {
+    const GREEN = '#3E8E4A', DARK = '#2E5A2A', BELLY = '#C9C46A';
+    if (o.k <= 0) {
+      // Lurking: a wavy dark shape under the surface, plus ripples
+      ctx.globalAlpha = 0.35;
+      for (let i = 0; i < 6; i++) rect(o.baseX - 12 + i * 4, y + Math.round(Math.sin(clock * 3 + i) * 2), 5, 3, '#1A3A2A');
+      ctx.globalAlpha = 1;
+      if (Math.floor(clock * 2 + o.y) % 2 === 0) rect(o.baseX - 6, y - 3, 12, 1, lv.theme.streak);
+      return;
+    }
+    const k = o.k, hx = o.headX, lift = 12 * k;
+    // Coils on the water, then the body arching up to the head
+    rect(o.baseX - 9, y + 1, 18, 1, lv.theme.streak);
+    for (let i = 0; i <= 6; i++) {
+      const u = i / 6;
+      const bx = o.baseX + (hx - o.baseX) * u, by = y - lift * u * (2 - u);
+      rect(bx - 2, by - 2, 5, 5, i % 2 ? GREEN : DARK);
+      rect(bx - 1, by - 1, 2, 2, i % 2 ? DARK : GREEN);
+    }
+    const top = y - lift;
+    rect(hx - 4, top - 4, 8, 7, GREEN);                         // head
+    rect(hx - 3, top + 1, 6, 2, BELLY);
+    rect(hx - 4, top - 6, 8, 3, '#5E7A3A'); rect(hx - 5, top - 4, 10, 1, '#44592A');   // helmet
+    rect(hx - 3, top - 3, 2, 2, '#F2D230'); rect(hx + 1, top - 3, 2, 2, '#F2D230');   // eyes
+    rect(hx - 2, top - 2, 1, 1, '#1A1A1A'); rect(hx + 2, top - 2, 1, 1, '#1A1A1A');
+    if (Math.floor(clock * 8) % 2 === 0) { rect(hx, top + 3, 1, 3, '#D62828'); rect(hx - 1, top + 6, 1, 1, '#D62828'); rect(hx + 1, top + 6, 1, 1, '#D62828'); }
+  }
+
+  // Big eagle with an aviator cap and goggles, diving in a zigzag
+  function drawEagle(o, y) {
+    const x = Math.round(o.x);
+    const flap = o.phase === 'dive' ? Math.floor(clock * 8) % 2 === 0 : false;
+    const BROWN = '#5A3A1A', WING = '#4A2E14';
+    if (o.phase === 'perch') {
+      // Sitting on the treetop, wings folded
+      rect(x - 5, y - 4, 10, 10, BROWN);
+      rect(x - 4, y - 10, 8, 7, '#FFFFFF');
+      rect(x - 4, y - 11, 8, 3, '#6E4420');                    // cap
+      rect(x - 3, y - 8, 2, 2, '#9BD8F0'); rect(x + 1, y - 8, 2, 2, '#9BD8F0');
+      rect(x - 1, y - 5, 2, 2, '#F2C230');
+      rect(x - 3, y + 6, 2, 2, '#F2C230'); rect(x + 1, y + 6, 2, 2, '#F2C230');   // talons
+      return;
+    }
+    // Diving toward Clooky (head points down the screen), big wings out
+    const wy = flap ? -3 : 1;
+    rect(x - 16, y - 2 + wy, 12, 4, WING); rect(x + 4, y - 2 + wy, 12, 4, WING);
+    rect(x - 16, y + 1 + wy, 3, 3, '#3A2410'); rect(x + 13, y + 1 + wy, 3, 3, '#3A2410');
+    rect(x - 12, y - 3 + wy, 8, 1, '#7A5230'); rect(x + 4, y - 3 + wy, 8, 1, '#7A5230');
+    rect(x - 5, y - 6, 10, 11, BROWN);
+    rect(x - 3, y - 9, 6, 3, '#FFFFFF');                       // white tail feathers (up the screen)
+    rect(x - 4, y + 4, 8, 7, '#FFFFFF');                       // white head
+    rect(x - 4, y + 4, 8, 2, '#6E4420');                       // aviator cap
+    rect(x - 3, y + 6, 2, 2, '#9BD8F0'); rect(x + 1, y + 6, 2, 2, '#9BD8F0');   // goggles
+    rect(x - 1, y + 10, 2, 3, '#F2C230');                      // hooked beak
+  }
+
   function drawCrate(x, y, drop) {
     const up = Math.round(drop * 26);
     const cy = y - up;
@@ -1259,11 +1479,14 @@
     rect(x - 2, y - 7, 4, 1, '#FFE066');
     rect(x + 3, y - 4, 2, 1, '#F2A33A');             // beak
     rect(x - 1, y - 5, 1, 1, '#1A1A1A');
-    rect(x - 3, y - 9, 6, 3, '#FFFFFF');             // medic helmet
-    rect(x - 1, y - 9, 2, 3, '#2FAF5A'); rect(x - 2, y - 8, 4, 1, '#2FAF5A');   // green plus
-    // Little flag with a heart
-    rect(x + 5, y - 11, 1, 10, '#6E4420');
-    sprite(['##.##', '#####', '.###.', '..#..'], x + 6, y - 11, { '#': '#FF6B8A' });
+    // White medic cap with a red cross
+    rect(x - 4, y - 10, 8, 3, '#FFFFFF');
+    rect(x - 4, y - 8, 9, 1, '#E6E6EE');              // brim
+    rect(x - 1, y - 10, 2, 3, '#D62828'); rect(x - 2, y - 9, 4, 1, '#D62828');
+    // Flag: red cross on white
+    rect(x + 5, y - 13, 1, 12, '#6E4420');
+    rect(x + 6, y - 13, 7, 5, '#FFFFFF');
+    rect(x + 8, y - 13, 2, 5, '#D62828'); rect(x + 6, y - 11, 7, 1, '#D62828');
   }
 
   function drawWall(o) {
@@ -1312,7 +1535,7 @@
     barn: [16, 14], hay: [8, 6], fence: [14, 5], tree: [10, 12], flowers: [8, 4],
     jtree: [14, 14], palm: [11, 13], fern: [9, 6], vine: [3, 10],
     cactus: [7, 11], rock: [9, 5], mesa: [14, 8], bones: [8, 3],
-    pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8]
+    pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36]
   };
   function drawDecor(d) {
     const y = sy(d.y);
@@ -1363,6 +1586,18 @@
         const fx = side < 0 ? edge + 1 : edge - 9;
         rect(fx, y - 3, 8, 3, '#FFFFFF'); rect(fx + 1, y, 6, 1, '#BFD9EA'); break;
       }
+      case 'redwood': {
+        // Tall redwood: reddish trunk, layered dark crown; the eagle perches on top
+        const snow = lv.theme.key === 'ice';
+        rect(x + 6, y - 26, 3, 26, '#8A3A22'); rect(x + 6, y - 26, 1, 26, '#A8543A');
+        for (let i = 0; i < 4; i++) {
+          const w = 6 + i * 2;
+          rect(x + 7 - w / 2, y - 30 + i * 6, w, 4, '#1F5A36');
+          if (snow) rect(x + 7 - w / 2, y - 30 + i * 6, w, 1, '#FFFFFF');
+        }
+        rect(x + 5, y - 33, 4, 3, '#1F5A36');
+        break;
+      }
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
         rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
@@ -1389,6 +1624,13 @@
       if ((k * 13) % 5 === 0) { rect((k * 29) % Math.max(1, l - 2), top + 1, 2, 1, T.landDot); rect(rr + 2 + (k * 31) % Math.max(1, W - rr - 4), top + 2, 2, 1, T.landDot); }
       rect(l - T.shoreW, top, T.shoreW, ROW, T.shore);
       rect(rr, top, T.shoreW, ROW, T.shore);
+      const il = lv.IL[rc], ir = lv.IR[rc];
+      if (ir > il) {
+        rect(il, top, ir - il, ROW, T.land);
+        rect(il, top, Math.min(T.shoreW, ir - il), ROW, T.shore);
+        rect(Math.max(il, ir - T.shoreW), top, Math.min(T.shoreW, ir - il), ROW, T.shore);
+        if ((k * 7) % 4 === 0 && ir - il > 10) rect(il + 3 + (k * 11) % (ir - il - 6), top + 1, 2, 1, T.landDot);
+      }
     }
   }
 
@@ -1439,6 +1681,7 @@
       else if (o.type === 'fox') drawFox(o.x, y, o.dir);
       else if (o.type === 'medic') drawMedic(o.x + (o.wobble > 0 ? Math.round(Math.sin(clock * 40)) : 0), y);
       else if (o.type === 'crate' && o.landed) drawCrate(o.x, y, 0);
+      else if (o.type === 'anaconda') drawAnaconda(o, y);
     }
     // Lasers
     for (const l of lasers) {
@@ -1458,6 +1701,7 @@
       if (y < -40 || y > PLAY_H + 40) continue;
       if (o.type === 'raccoon') drawRaccoon(o, y);
       else if (o.type === 'hawk') drawHawk(o.x, y, -o.side);
+      else if (o.type === 'eagle') drawEagle(o, y);
       else if (o.type === 'crate' && !o.landed) drawCrate(o.x, y, o.drop);
     }
     // Smoke and feathers
@@ -1490,6 +1734,7 @@
     pollGamepad();
     if (state !== 'paused' && state !== 'title' && state !== 'over') update(dt);
     else clock += dt;
+    updateWind();
     draw();
     requestAnimationFrame(frame);
   }
