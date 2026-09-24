@@ -286,7 +286,7 @@
       refillPerSecond: 0.55     // how fast a GRUBS crate refills the meter
     },
     laser: { cooldown: 0.22, speed: 300, length: 18, jamSeconds: 3 },
-    tripleLaser: { every: 1500, seconds: 10, angle: 40 },   // power-up: 3 beams (straight, 40° left, 40° right)
+    tripleLaser: { every: 1000, seconds: 10, angle: 40 },   // power-up: 3 beams (straight, 40° left, 40° right)
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
@@ -1339,6 +1339,26 @@
     rect(x - 2, y - 13, 1, 1, '#D62828'); rect(x, y - 13, 1, 1, '#D62828');   // comb peeking out
     // Beak
     rect(x - 1, y - 15, 2, 3, '#F2A33A');
+    // Triple laser: a big shining purple star on her back, with a glow and circling sparkles
+    if (tripleT > 0 && opt.rank == null) {
+      const STAR = ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'];
+      const sx = x - 4, sy0 = y - 4;
+      const pulse = Math.floor(clock * 6) % 2 === 0;
+      ctx.globalAlpha = pulse ? 0.45 : 0.3;                 // soft glow
+      rect(x - 8, y - 6, 17, 13, '#B98CFF'); rect(x - 6, y - 8, 13, 17, '#B98CFF');
+      ctx.globalAlpha = 1;
+      const on = (r, c) => r >= 0 && r < STAR.length && STAR[r][c] === '#';
+      STAR.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === '#') {
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (!on(r + dr, c + dc)) rect(sx + c + dc, sy0 + r + dr, 1, 1, '#3E1C7A');
+      } });
+      sprite(STAR, sx, sy0, { '#': pulse ? '#C9A6FF' : '#9B5CF6' });
+      rect(x - 1, y - 1, 3, 2, '#FFFFFF');                  // shine
+      for (let i = 0; i < 4; i++) {                         // sparkles orbiting the star
+        const a = clock * 4 + i * Math.PI / 2;
+        const px2 = x + Math.round(Math.cos(a) * 12), py2 = y + Math.round(Math.sin(a) * 10);
+        rect(px2, py2, 1, 1, '#FFFFFF'); rect(px2 - 1, py2, 3, 1, i % 2 ? '#FFFFFF' : '#E0CCFF'); rect(px2, py2 - 1, 1, 3, '#E0CCFF');
+      }
+    }
     // Tiny rank badge on the helmet
     const ins = INSIGNIA[opt.rank != null ? opt.rank : rankIdx];
     rect(x + 1, y - 12, 2, 2, ins.c);
