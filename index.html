@@ -58,11 +58,14 @@
   .hud {
     width: var(--w, 100%);
     display: flex;
+    flex-wrap: wrap;
+    row-gap: 6px;
+    min-height: 32px;
+    flex-shrink: 0;
     align-items: center;
     gap: 1.2em;
     color: var(--hud-ink);
     font-size: clamp(12px, 2.4vmin, 20px);
-    height: 32px;
   }
   .hud .spacer { flex: 1; }
   .hud span, .hud .sound { white-space: nowrap; }
@@ -295,7 +298,7 @@
     },
     level: {
       sections: 4,              // sandbag walls sit between sections
-      sectionLength: 1400,      // pixels; about 35 seconds at normal speed
+      sectionLength: 800,       // pixels; about 20 seconds at normal speed (a level takes about 1.5 minutes)
       startLength: 90           // calm stretch before section 1
     },
     ranks: [
@@ -318,12 +321,12 @@
       maxWidth: Math.max(96, 196 - d * 18),       // widest river   (level 1: 196, level 3: 160, level 7+: 96)
       drift: Math.min(2.8, 1.1 + d * 0.3),        // how quickly the river bends (pixels per row)
       enemySpeed: Math.min(2.4, 1 + d * 0.13),
-      enemiesPerSection: Math.min(24, 10 + d * 2),
-      islandGap: Math.max(220, 620 - d * 90),      // distance between islands (smaller = more islands)
+      enemiesPerSection: Math.round(Math.min(24, 10 + d * 2) * CONFIG.level.sectionLength / 1400),   // same enemy density whatever the section length
+      islandsPerSection: d < 3 ? 1 : 2,            // islands between each pair of sandbag walls
       islandMax: Math.min(100, 44 + d * 12),       // widest an island gets
       channel: Math.max(32, 46 - d * 3),           // each side of an island stays at least this wide
       crateGap: Math.min(400, 230 + d * 28),      // distance between GRUBS crates
-      medicsPerSection: d === 0 ? 1 : 2,
+      medicsPerSection: 1,
       weights: {                                   // which enemies show up
         fox: Math.max(2, 3.5 - d * 0.3),
         raccoon: 3 + Math.min(2, d * 0.5),
@@ -379,7 +382,8 @@
     const padH = isTouch && !side ? 112 : 0;
     const padW = side ? 2 * 190 : 0;
     const availW = vw - 16 - padW;
-    const availH = vh - 16 - 40 - padH;
+    const hudH = document.querySelector('.hud').offsetHeight || 32;
+    const availH = vh - 16 - hudH - 8 - padH;
     const s = Math.max(0.5, Math.min(availW / W, availH / H));
     const w = Math.floor(W * s), h = Math.floor(H * s);
     document.documentElement.style.setProperty('--w', w + 'px');
@@ -536,13 +540,17 @@
 
     // Islands: stretches (in rows) where the river widens and splits around land
     const islands = [];
-    for (let y = startLength + 240; y < baseY - 300;) {
-      y += D.islandGap * (0.7 + rng() * 0.6);
-      const len = 150 + rng() * 180;
-      if (y + len > baseY - 260) break;
-      if (wallYs.some(wy => y < wy + 120 && y + len > wy - 230)) continue;
-      islands.push([Math.floor(y / ROW), Math.floor((y + len) / ROW)]);
-      y += len;
+    for (let sct = 0; sct < sections; sct++) {
+      const s0 = startLength + sct * sectionLength;
+      const lo = s0 + (sct === 0 ? 150 : 90);                         // clear of the wall behind
+      const hi = sct === sections - 1 ? baseY - 230 : s0 + sectionLength - 190;   // and the wall (or base) ahead
+      const slot = (hi - lo) / D.islandsPerSection;
+      for (let k = 0; k < D.islandsPerSection; k++) {
+        const len = Math.min(slot - 30, 130 + rng() * 130);
+        if (len < 100) continue;
+        const y = lo + k * slot + rng() * (slot - len);
+        islands.push([Math.floor(y / ROW), Math.floor((y + len) / ROW)]);
+      }
     }
     const islandSoon = r => islands.some(([a, b]) => r >= a - 55 && r <= b);
 
@@ -609,6 +617,18 @@
       }
       return safeX(y);
     };
+    // A spot in the left (-1) or right (1) channel beside an island that stays in open water for a stretch
+    const channelX = (y, side, margin) => {
+      for (let tries = 0; tries < 30; tries++) {
+        const r = rowOf(y);
+        const [l, rr] = side < 0 ? [L[r], IL[r]] : [IR[r], R[r]];
+        const x = l + margin + rng() * Math.max(0, rr - l - 2 * margin);
+        let ok = true;
+        for (let yy = y - 24; yy <= y + 24 && ok; yy += ROW) ok = isWater(yy, x, margin - 4);
+        if (ok) return x;
+      }
+      return null;
+    };
     const tooCloseToWall = y => wallYs.some(wy => Math.abs(y - wy) < 70) || y > baseY - 120;
 
     // Objects (the plan is never changed; each life copies the part still ahead)
@@ -620,11 +640,17 @@
 
       // GRUBS crates, evenly spaced so feed never runs out on a careful run
       for (let y = s0 + D.crateGap * 0.55; y < s1 - 40; y += D.crateGap * (0.85 + rng() * 0.3)) {
-        // Keep crates out of island stretches, so picking either channel never means missing feed
-        const isl = islands.find(([a, b]) => y > a * ROW - 60 && y < b * ROW + 60);
-        if (isl) y = isl[1] * ROW + 60;
-        if (y >= s1 - 40 || tooCloseToWall(y)) continue;
-        plan.push({ type: 'crate', x: waterX(y, 20), y }); used.push(y);
+        if (tooCloseToWall(y)) continue;
+        // Beside an island, put a crate in each channel so either choice gets feed
+        const r = Math.floor(y / ROW);
+        if (hasIsland(r)) {
+          const lx = channelX(y, -1, 14), rx = channelX(y, 1, 14);
+          if (lx != null) plan.push({ type: 'crate', x: lx, y });
+          if (rx != null) plan.push({ type: 'crate', x: rx, y });
+        } else {
+          plan.push({ type: 'crate', x: waterX(y, 20), y });
+        }
+        used.push(y);
       }
       // Enemies, spread through the section
       const types = Object.keys(D.weights);
@@ -845,6 +871,7 @@
     particles = [];
     hideOverlays();
     pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
+    fit();
     sfx.start();
     startLevel();
   }
@@ -1864,6 +1891,7 @@
     devMode = new URLSearchParams(location.search).get('dev') === '1';
   }
   $('skipBtn').hidden = !devMode;
+  requestAnimationFrame(fit);
   $('feedBtn').hidden = !devMode;
   $('tripleBtn').hidden = !devMode;
   $('tripleBtn').addEventListener('click', () => { if (state === 'playing' || state === 'intro') startTriple(); });
