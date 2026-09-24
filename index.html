@@ -312,13 +312,14 @@
   function difficulty(level) {
     const d = level - 1;
     return {
-      minWidth: Math.max(58, 124 - d * 8),        // narrowest river
-      maxWidth: Math.max(92, 196 - d * 9),        // widest river
-      drift: Math.min(2.6, 1.1 + d * 0.22),       // how quickly the river bends (pixels per row)
+      minWidth: Math.max(56, 120 - d * 16),       // narrowest river (level 1: 120, level 3: 88, level 5+: 56)
+      maxWidth: Math.max(96, 196 - d * 18),       // widest river   (level 1: 196, level 3: 160, level 7+: 96)
+      drift: Math.min(2.8, 1.1 + d * 0.3),        // how quickly the river bends (pixels per row)
       enemySpeed: Math.min(2.4, 1 + d * 0.13),
       enemiesPerSection: Math.min(24, 10 + d * 2),
-      islandGap: Math.max(240, 600 - d * 60),      // distance between islands (smaller = more islands)
-      islandMax: Math.min(84, 48 + d * 6),         // widest an island gets
+      islandGap: Math.max(220, 620 - d * 90),      // distance between islands (smaller = more islands)
+      islandMax: Math.min(100, 44 + d * 12),       // widest an island gets
+      channel: Math.max(32, 46 - d * 3),           // each side of an island stays at least this wide
       crateGap: Math.min(400, 230 + d * 28),      // distance between GRUBS crates
       medicsPerSection: d === 0 ? 1 : 2,
       weights: {                                   // which enemies show up
@@ -528,7 +529,7 @@
     const rows = Math.ceil((baseY + 400) / ROW);
     const L = new Int16Array(rows), R = new Int16Array(rows);
     const IL = new Int16Array(rows), IR = new Int16Array(rows);   // island edges (equal = no island)
-    const CHANNEL = 42;                                            // each side of an island stays at least this wide
+    const CHANNEL = D.channel;
 
     // Islands: stretches (in rows) where the river widens and splits around land
     const islands = [];
@@ -550,8 +551,8 @@
       const nearWall = wallYs.some(wy => y > wy - 150 && y < wy + 50);
       if (y < startLength + 60) { tc = W / 2; tw = D.maxWidth; }
       else if (y > baseY - 180) { tc = W / 2; tw = 172; }
-      else if (nearWall) { tc = c; tw = 104; }
-      else if (islandSoon(r)) { tc = W / 2; tw = 204; }
+      else if (nearWall) { tc = c; tw = Math.min(104, D.maxWidth); }
+      else if (islandSoon(r)) { tc = W / 2; tw = Math.min(W - 20, 2 * CHANNEL + D.islandMax + 12); }   // just wide enough for the island
       else if (r >= nextBend) {
         tw = D.minWidth + rng() * (D.maxWidth - D.minWidth);
         const half = tw / 2 + 12;
