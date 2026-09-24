@@ -231,7 +231,7 @@
     <div class="overlay" id="titleScreen">
       <h1>Captain Clooky</h1>
       <canvas class="title-sprite" id="titleSprite" width="32" height="32" aria-hidden="true"></canvas>
-      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks and raccoon planes with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
+      <p>Fly Captain Clooky up the river! Zap the fox rafts, swooping hawks and pouncing raccoons with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
       <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
       <p id="titleBest">Best 0 · Private</p>
       <button class="play" id="playBtn" type="button">Play</button>
@@ -249,7 +249,7 @@
       <p id="finalRank">Rank reached: Private</p>
       <p id="finalBest"></p>
       <div class="buttons">
-        <button class="play" id="continueBtn" type="button">Continue</button>
+        <button class="play" id="continueBtn" type="button">Restart level</button>
         <button class="play quiet" id="titleBtn" type="button">Back to title</button>
       </div>
     </div>
@@ -287,7 +287,7 @@
       lowWarning: 0.25,         // blink and beep below this
       refillPerSecond: 0.55     // how fast a GRUBS crate refills the meter
     },
-    laser: { cooldown: 0.22, speed: 230, jamSeconds: 3 },
+    laser: { cooldown: 0.22, speed: 300, length: 18, jamSeconds: 3 },
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
@@ -319,13 +319,13 @@
       maxWidth: Math.max(92, 196 - d * 9),        // widest river
       drift: Math.min(2.6, 1.1 + d * 0.22),       // how quickly the river bends (pixels per row)
       enemySpeed: Math.min(2.4, 1 + d * 0.13),
-      enemiesPerSection: Math.min(18, 5 + d * 2),
+      enemiesPerSection: Math.min(20, 8 + d * 2),
       crateGap: Math.min(440, 240 + d * 32),      // distance between GRUBS crates
       medicsPerSection: d === 0 ? 1 : 2,
       weights: {                                   // which enemies show up
-        fox: Math.max(2, 6 - d),
-        raccoon: 2 + Math.min(3, d),
-        hawk: d === 0 ? 0.6 : 1 + Math.min(3, d * 0.7)
+        fox: Math.max(2, 3.5 - d * 0.3),
+        raccoon: 3 + Math.min(2, d * 0.5),
+        hawk: 2 + Math.min(2.5, d * 0.6)
       }
     };
   }
@@ -455,6 +455,8 @@
     lifeUp()   { [659, 880, 1175].forEach((f, i) => tone(f, 0.1, 'square', 0.05, 0, i * 0.08)); },
     promote()  { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.3 : 0.1, 'square', 0.05, 0, i * 0.1)); },
     levelDone(){ [523, 587, 659, 784, 880, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0, i * 0.09)); tone(1047, 0.4, 'triangle', 0.06, 0, 0.6); },
+    chitter()  { [1400, 1700, 1300].forEach((f, i) => tone(f, 0.04, 'square', 0.03, 0, i * 0.05)); },
+    splash()   { noise(0.3, 0.08, 2600, 500); },
     start()    { tone(523, 0.08, 'square', 0.05); tone(659, 0.08, 'square', 0.05, 0, 0.09); tone(784, 0.12, 'square', 0.05, 0, 0.18); }
   };
 
@@ -479,7 +481,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   const HIT = {                    // hit boxes (width, height), centred on the object
-    fox: [20, 10], hawk: [18, 10], raccoon: [18, 14], crate: [24, 16], medic: [14, 10]
+    fox: [20, 10], hawk: [18, 10], raccoon: [14, 12], crate: [24, 16], medic: [14, 10]
   };
   const REFILL_ZONE = [24, 30];    // flying through this area around a crate refills feed
 
@@ -547,7 +549,7 @@
         const pick = rng() * total;
         const type = pick < D.weights.fox ? 'fox' : pick < D.weights.fox + D.weights.raccoon ? 'raccoon' : 'hawk';
         if (type === 'hawk') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
-        else if (type === 'raccoon') plan.push({ type, x: (bankL(y) + bankR(y)) / 2, y, amp: 24 + rng() * 26, phase: rng() * 6.28 });
+        else if (type === 'raccoon') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
         else plan.push({ type, x: waterX(y, 14), y, dir: rng() < 0.5 ? -1 : 1 });
         used.push(y);
       }
@@ -652,7 +654,10 @@
       const o = { ...p, alive: true, t: 0 };
       if (o.type === 'crate') { o.drop = 1; o.landed = false; }
       if (o.type === 'hawk') { o.active = false; o.x = o.side < 0 ? 8 : W - 8; }
-      if (o.type === 'raccoon') o.baseX = o.x;
+      if (o.type === 'raccoon') {
+        o.phase = 'wait'; o.hop = 0;
+        o.x = o.side < 0 ? Math.max(7, lv.bankL(o.y) - 9) : Math.min(W - 7, lv.bankR(o.y) + 9);
+      }
       objects.push(o);
     }
   }
@@ -733,6 +738,7 @@
   function gameOver() {
     state = 'over';
     pauseBtn.hidden = true;
+    banner.hidden = true;
     $('finalScore').textContent = 'Score ' + score.toLocaleString();
     $('finalRank').textContent = 'Rank reached: ' + CONFIG.ranks[peakRank].name;
     $('finalBest').textContent = score >= best && score > 0 ? 'New best score!' : 'Best ' + best.toLocaleString() + ' · ' + CONFIG.ranks[bestRank].name;
@@ -961,12 +967,12 @@
       }
       if (jamT <= 0) showBanner('Laser fixed!', 0.9);
     } else if (held('fire') && fireCooldown <= 0) {
-      lasers.push({ x: px, wy: dist + 12 });
+      lasers.push({ x: px, wy: dist + 14 + CONFIG.laser.length / 2 });
       fireCooldown = CONFIG.laser.cooldown;
       sfx.pew();
     }
     for (const l of lasers) l.wy += (CONFIG.laser.speed + speedNow) * dt;
-    lasers = lasers.filter(l => sy(l.wy) > -8 && !l.used);
+    lasers = lasers.filter(l => sy(l.wy) > -CONFIG.laser.length && !l.used);
 
     // Objects move
     const D = difficulty(level);
@@ -979,8 +985,27 @@
         const l = lv.bankL(o.y) + 12, r = lv.bankR(o.y) - 12;
         if (o.x < l) { o.x = l; o.dir = 1; }
         if (o.x > r) { o.x = r; o.dir = -1; }
-      } else if (o.type === 'raccoon' && onScreen) {
-        o.x = o.baseX + Math.sin(o.t * 2.2 * D.enemySpeed + o.phase) * o.amp;
+      } else if (o.type === 'raccoon') {
+        const ahead = o.y - dist;
+        if (o.phase === 'wait' && ahead < 95 && ahead > 20) {
+          o.phase = 'jump'; o.jt = 0; o.fromX = o.x;
+          o.toX = clamp(px, lv.bankL(o.y) + 10, lv.bankR(o.y) - 10);
+          sfx.chitter();
+        }
+        if (o.phase === 'jump') {
+          o.jt = Math.min(1, o.jt + dt * 1.4 * Math.sqrt(D.enemySpeed));
+          o.x = o.fromX + (o.toX - o.fromX) * o.jt;
+          o.hop = Math.sin(Math.PI * o.jt) * 16;
+          if (o.jt >= 1) {
+            o.phase = 'swim'; o.hop = 0;
+            for (let i = 0; i < 6; i++) particles.push({ kind: 'bit', x: o.x + (Math.random() - 0.5) * 12, wy: o.y, vx: (Math.random() - 0.5) * 40, vy: 20 + Math.random() * 25, life: 0.5, color: lv.theme.streak });
+            sfx.splash();
+          }
+        } else if (o.phase === 'swim') {
+          const dx = px - o.x;
+          o.x += Math.sign(dx) * Math.min(Math.abs(dx), 9 * D.enemySpeed * dt);
+          o.x = clamp(o.x, lv.bankL(o.y) + 8, lv.bankR(o.y) - 8);
+        }
       } else if (o.type === 'hawk') {
         if (!o.active && o.y - dist < 125) { o.active = true; buk(900, 1300, 0.12, 0, 0.06); }
         if (o.active) o.x -= o.side * 110 * D.enemySpeed * dt;
@@ -998,12 +1023,12 @@
       for (const o of objects) {
         if (!o.alive || l.used) continue;
         if (o.type === 'wall') {
-          if (l.wy >= o.y - 6 && l.wy <= o.y + 8 && l.x > lv.bankL(o.y) && l.x < lv.bankR(o.y)) { l.used = true; hitObject(o); }
+          if (Math.abs(l.wy - o.y) < 7 + CONFIG.laser.length / 2 && l.x > lv.bankL(o.y) && l.x < lv.bankR(o.y)) { l.used = true; hitObject(o); }
           continue;
         }
         if (o.type === 'crate' && !o.landed) continue;
         const [bw, bh] = HIT[o.type];
-        if (boxHit(l.x, l.wy, 2, 8, o.x, o.y, bw, bh)) { l.used = true; hitObject(o); }
+        if (boxHit(l.x, l.wy, 2, CONFIG.laser.length, o.x, o.y, bw, bh)) { l.used = true; hitObject(o); }
       }
     }
     lasers = lasers.filter(l => !l.used);
@@ -1049,6 +1074,10 @@
   //  Drawing helpers
   // =====================================================================
   function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+  function line(x0, y0, x1, y1, c) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1;
+    for (let i = 0; i <= n; i++) rect(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 1, 1, c);
+  }
   function sprite(rows, x, y, colors) {       // tiny pixel art from strings
     rows.forEach((row, r) => {
       for (let c = 0; c < row.length; c++) { const col = colors[row[c]]; if (col) rect(x + c, y + r, 1, 1, col); }
@@ -1120,18 +1149,28 @@
       rect(x - 11, y - 4 + i * 3, 1, 3, '#5E3A1A'); rect(x + 10, y - 4 + i * 3, 1, 3, '#5E3A1A');
     }
     rect(x - 7, y - 5, 1, 10, '#5E3A1A'); rect(x + 6, y - 5, 1, 10, '#5E3A1A');
-    // Fox in a camo uniform
-    const f = dir;
-    rect(x - 4, y - 5, 8, 6, '#6B7A3A');            // camo coat
-    rect(x - 2, y - 4, 2, 2, '#4E5A2A'); rect(x + 1, y - 2, 2, 1, '#8A9A52');
-    rect(x - 7 * f - (f < 0 ? 5 : 0), y - 3, 6, 3, '#E07A2E');   // tail
-    rect(x - 7 * f - (f < 0 ? 5 : 0) + (f > 0 ? 0 : 4), y - 3, 2, 3, '#FFFFFF');
-    rect(x - 3, y - 11, 6, 6, '#E07A2E');            // head
-    rect(x - 3, y - 13, 2, 2, '#E07A2E'); rect(x + 1, y - 13, 2, 2, '#E07A2E');   // ears
-    rect(x - 1, y - 7, 2, 2, '#FFFFFF');             // muzzle
-    rect(x - 2, y - 9, 1, 1, '#1A1A1A'); rect(x + 1, y - 9, 1, 1, '#1A1A1A');
-    rect(x - 4, y - 12, 8, 2, '#4E5A2A');            // army helmet
-    rect(x - 3, y - 13, 6, 1, '#4E5A2A');
+    // Bushy tail hanging over the side of the raft, white tip dipping toward the water
+    const t = dir >= 0 ? 1 : -1;
+    const tx = t > 0 ? x + 8 : x - 12;
+    rect(tx, y - 3, 4, 3, '#E07A2E');
+    rect(tx + (t > 0 ? 1 : -1), y, 4, 4, '#E07A2E');
+    rect(tx + (t > 0 ? 2 : -2), y + 4, 3, 3, '#FFFFFF');
+    rect(tx + (t > 0 ? 1 : 0), y - 2, 1, 5, '#C9621E');
+    // Camo jacket: olive, khaki, brown and dark green patches
+    rect(x - 5, y - 7, 10, 8, '#6B7A3A');
+    rect(x - 4, y - 6, 3, 2, '#3E4A22'); rect(x + 1, y - 7, 3, 2, '#A89A6A');
+    rect(x - 2, y - 4, 3, 2, '#7A5A3A'); rect(x + 2, y - 3, 2, 3, '#3E4A22');
+    rect(x - 5, y - 2, 2, 2, '#A89A6A'); rect(x - 1, y - 1, 2, 2, '#4E5A2A');
+    rect(x - 6, y - 5, 1, 4, '#E07A2E'); rect(x + 5, y - 5, 1, 4, '#E07A2E');   // paws
+    // Head with pointy ears
+    rect(x - 4, y - 13, 8, 6, '#E07A2E');
+    rect(x - 4, y - 15, 3, 2, '#E07A2E'); rect(x - 4, y - 16, 1, 1, '#E07A2E');
+    rect(x + 1, y - 15, 3, 2, '#E07A2E'); rect(x + 3, y - 16, 1, 1, '#E07A2E');
+    rect(x - 3, y - 14, 1, 1, '#7A2E10'); rect(x + 2, y - 14, 1, 1, '#7A2E10');   // inner ears
+    rect(x - 4, y - 10, 2, 3, '#FFFFFF'); rect(x + 2, y - 10, 2, 3, '#FFFFFF');   // white cheeks
+    rect(x - 1, y - 9, 2, 2, '#FFFFFF');                                          // muzzle
+    rect(x - 1, y - 8, 2, 1, '#1A1A1A');                                          // nose
+    rect(x - 2, y - 11, 1, 1, '#1A1A1A'); rect(x + 1, y - 11, 1, 1, '#1A1A1A');   // eyes
   }
 
   function drawHawk(x, y, dir) {
@@ -1149,36 +1188,61 @@
     m(-2, -1, 4, 2, '#6B7A3A');                      // uniform scarf
   }
 
-  function drawRaccoon(x, y) {
-    const prop = Math.floor(clock * 20) % 2 === 0;
-    // Little plane, nose pointing down toward Clooky
-    rect(x - 9, y - 3, 18, 4, '#C0392B');            // wings
-    rect(x - 9, y - 3, 18, 1, '#E05A4B');
-    rect(x - 2, y - 8, 4, 14, '#6B7A3A');            // fuselage
-    rect(x - 4, y - 8, 8, 2, '#C0392B');             // tail wing
-    rect(prop ? x - 4 : x - 1, y + 6, prop ? 8 : 2, 1, '#E6E9F0');   // spinning propeller
-    // Raccoon pilot
-    rect(x - 3, y - 4, 6, 5, '#8C8C94');
-    rect(x - 3, y - 3, 6, 1, '#2E2E36');             // bandit mask
-    rect(x - 2, y - 3, 1, 1, '#FFFFFF'); rect(x + 1, y - 3, 1, 1, '#FFFFFF');
-    rect(x - 3, y - 6, 6, 2, '#6B7A3A');             // cap
-    rect(x - 4, y - 5, 1, 2, '#8C8C94'); rect(x + 3, y - 5, 1, 2, '#8C8C94');   // ears
+  // Raccoon in a camo vest: crouches on the bank, pounces, then swims after Clooky
+  function drawRaccoon(o, y) {
+    const x = Math.round(o.x), f = o.side < 0 ? 1 : -1;   // faces the river
+    const m = (dx, dy, w, h, c) => rect(f > 0 ? x + dx : x - dx - w, y + dy, w, h, c);
+    const GRAY = '#8C8C94', DARK = '#2E2E36', LIGHT = '#C8C8D0';
+    if (o.phase === 'swim') {
+      // Just the head and ringed tail above the water, with ripples
+      const bob = Math.round(Math.sin(clock * 6 + o.y) * 0.8);
+      rect(x - 7, y + 3, 14, 1, lv.theme.streak);
+      m(-8, -1 + bob, 3, 2, GRAY); m(-11, -1 + bob, 3, 2, DARK); m(-14, -1 + bob, 3, 2, GRAY);   // tail
+      m(-4, -5 + bob, 8, 6, GRAY);
+      m(-4, -7 + bob, 2, 2, GRAY); m(2, -7 + bob, 2, 2, GRAY);
+      m(-4, -3 + bob, 8, 2, DARK);
+      m(-2, -3 + bob, 1, 1, '#FFFFFF'); m(1, -3 + bob, 1, 1, '#FFFFFF');
+      m(3, -1 + bob, 2, 1, LIGHT); m(4, -1 + bob, 1, 1, '#1A1A1A');
+      return;
+    }
+    const hop = Math.round(o.hop || 0);
+    const crouch = o.phase === 'wait' ? Math.round(Math.abs(Math.sin(clock * 5 + o.y)) ) : 0;
+    const yy = -hop + crouch;
+    if (hop > 2) { ctx.globalAlpha = 0.25; rect(x - 6, y + 4, 12, 2, '#1A2A4A'); ctx.globalAlpha = 1; }   // shadow
+    // Ringed tail
+    m(-11, yy - 3, 3, 3, GRAY); m(-14, yy - 4, 3, 3, DARK); m(-16, yy - 6, 3, 3, GRAY); m(-16, yy - 8, 2, 2, DARK);
+    // Body in a camo vest
+    m(-8, yy - 5, 11, 7, GRAY);
+    m(-6, yy - 5, 7, 6, '#6B7A3A'); m(-5, yy - 4, 2, 2, '#3E4A22'); m(-2, yy - 2, 2, 2, '#A89A6A'); m(-4, yy - 1, 2, 1, '#7A5A3A');
+    // Legs (stretched out while leaping)
+    if (hop > 2) { m(-9, yy + 1, 2, 3, DARK); m(2, yy + 1, 2, 3, DARK); }
+    else { m(-7, yy + 2, 2, 2, DARK); m(0, yy + 2, 2, 2, DARK); }
+    // Head with bandit mask
+    m(1, yy - 10, 8, 7, GRAY);
+    m(1, yy - 12, 2, 2, GRAY); m(6, yy - 12, 2, 2, GRAY); m(1, yy - 12, 1, 1, DARK); m(7, yy - 12, 1, 1, DARK);
+    m(1, yy - 8, 8, 2, DARK);
+    m(3, yy - 8, 1, 1, '#FFFFFF'); m(6, yy - 8, 1, 1, '#FFFFFF');
+    m(7, yy - 6, 3, 2, LIGHT); m(9, yy - 6, 1, 1, '#1A1A1A');
   }
 
   function drawCrate(x, y, drop) {
     const up = Math.round(drop * 26);
     const cy = y - up;
     if (drop > 0) {
-      // Parachute
-      rect(x - 11, cy - 20, 22, 3, '#FFFFFF');
-      rect(x - 9, cy - 22, 18, 2, '#F08A4B');
-      rect(x - 6, cy - 23, 12, 1, '#F08A4B');
-      rect(x - 11, cy - 17, 4, 1, '#F08A4B'); rect(x + 7, cy - 17, 4, 1, '#F08A4B');
-      for (const dx of [-10, -3, 2, 9]) rect(x + dx, cy - 17, 1, 9, '#E6E0D0');
+      // Red and white striped parachute
+      const top = cy - 26;
+      const rows = [[-6, 12], [-10, 20], [-12, 24], [-12, 24]];
+      rows.forEach(([dx, w], r) => {
+        for (let k = 0; k < w; k += 4) rect(x + dx + k, top + r, Math.min(4, w - k), 1, ((dx + k + 12) / 4) % 2 ? '#FFFFFF' : '#D62828');
+      });
+      rect(x - 12, top + 4, 24, 1, '#A81E1E');
+      // Lines from the canopy edges meet at the top of the crate (an upside-down triangle)
+      const tip = cy - 8;
+      for (const ex of [-12, -5, 4, 11]) line(x + ex, top + 5, x + (ex < 0 ? -1 : 0), tip, '#E6E0D0');
       // Shadow on the water shows where it will land
       ctx.globalAlpha = 0.25; rect(x - 10, y + 4, 20, 3, '#1A2A4A'); ctx.globalAlpha = 1;
     } else {
-      rect(x - 13, y + 7, 26, 2, THEMES[0].streak);   // ripples
+      rect(x - 13, y + 7, 26, 2, lv.theme.streak);   // ripples
     }
     rect(x - 12, cy - 8, 24, 16, '#A8733A');
     rect(x - 12, cy - 8, 24, 1, '#C9924F');
@@ -1379,17 +1443,20 @@
     // Lasers
     for (const l of lasers) {
       const y = sy(l.wy);
-      rect(l.x - 1, y - 4, 2, 7, '#9B5CF6'); rect(l.x, y - 5, 1, 9, '#E0CCFF');
+      const len = CONFIG.laser.length;
+      ctx.globalAlpha = 0.35; rect(l.x - 2, y - len / 2 - 1, 4, len + 2, '#B98CFF'); ctx.globalAlpha = 1;   // glow
+      rect(l.x - 1, y - len / 2, 2, len, '#9B5CF6');
+      rect(l.x, y - len / 2, 1, len, '#E0CCFF');
     }
     // Clooky
-    const showPlayer = state !== 'dying' && state !== 'title' && !(invulnT > 0 && Math.floor(clock * 12) % 2 === 0);
+    const showPlayer = state !== 'dying' && state !== 'title' && state !== 'over' && !(invulnT > 0 && Math.floor(clock * 12) % 2 === 0);
     if (showPlayer) drawClooky(Math.round(px), PLAYER_Y);
     // Things in the air
     for (const o of objects) {
       if (!o.alive) continue;
       const y = sy(o.y);
       if (y < -40 || y > PLAY_H + 40) continue;
-      if (o.type === 'raccoon') drawRaccoon(o.x, y);
+      if (o.type === 'raccoon') drawRaccoon(o, y);
       else if (o.type === 'hawk') drawHawk(o.x, y, -o.side);
       else if (o.type === 'crate' && !o.landed) drawCrate(o.x, y, o.drop);
     }
