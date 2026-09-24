@@ -230,6 +230,7 @@
     <span id="rank">Private</span>
     <span>Level <b id="levelNum">1</b><span class="wide-only" id="levelName"> · Farm River</span></span>
     <span class="spacer"></span>
+    <button class="sound icon-btn" id="skipBtn" type="button" aria-label="Skip level" title="Skip level" hidden></button>
     <button class="sound icon-btn" id="pauseBtn" type="button" aria-label="Pause" hidden></button>
     <button class="sound icon-btn" id="soundBtn" type="button" aria-pressed="true" aria-label="Sound on"></button>
   </div>
@@ -268,7 +269,6 @@
   <!-- Test buttons: hidden unless test mode is on (open the game with ?dev=1; ?dev=0 turns it off). -->
   <div class="devbar" id="devbar" hidden>
     <span>Test:</span>
-    <button class="sound" id="skipBtn" type="button">Skip level</button>
     <button class="sound" id="feedBtn" type="button">Full feed</button>
     <button class="sound" id="tripleBtn" type="button">Triple</button>
   </div>
@@ -527,6 +527,7 @@
     pause: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="4" height="12" fill="currentColor"/><rect x="9" y="2" width="4" height="12" fill="currentColor"/></svg>',
     play: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2l10 6-10 6z" fill="currentColor"/></svg>',
     soundOn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 6h3l4-4v12l-4-4H1z" fill="currentColor"/><path d="M10.5 5.5a3.5 3.5 0 010 5M12.5 3.5a6.3 6.3 0 010 9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+    skip: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 3l7 5-7 5zM7 3l7 5-7 5z" fill="currentColor"/><rect x="13" y="3" width="2" height="10" fill="currentColor"/></svg>',
     soundOff: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 6h3l4-4v12l-4-4H1z" fill="currentColor"/><path d="M10.5 5.5l4 5M14.5 5.5l-4 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
   };
   function setPauseIcon(paused) {
@@ -539,6 +540,7 @@
     soundBtn.setAttribute('aria-pressed', String(soundOn));
   }
   setPauseIcon(false); setSoundIcon();
+  $('skipBtn').innerHTML = ICONS.skip;
 
   soundBtn.addEventListener('click', () => {
     soundOn = !soundOn;
@@ -917,7 +919,7 @@
     tripleT = 0; nextTripleAt = CONFIG.tripleLaser.every;
     particles = [];
     hideOverlays();
-    pauseBtn.hidden = false; setPauseIcon(false);
+    pauseBtn.hidden = false; setPauseIcon(false); $('skipBtn').hidden = false;
     fit();
     sfx.start();
     startLevel();
@@ -948,7 +950,7 @@
 
   function gameOver() {
     state = 'over';
-    pauseBtn.hidden = true;
+    pauseBtn.hidden = true; $('skipBtn').hidden = true;
     banner.hidden = true;
     $('finalScore').textContent = 'Score ' + score.toLocaleString();
     $('finalRank').textContent = 'Rank reached: ' + CONFIG.ranks[peakRank].name;
@@ -2015,10 +2017,14 @@
   $('devbar').hidden = !devMode;
   requestAnimationFrame(fit);
   $('tripleBtn').addEventListener('click', () => { if (state === 'playing' || state === 'intro') startTriple(); });
+  // Skip level (for everyone): straight to the next level, keeping score and lives but no level bonus
   $('skipBtn').addEventListener('click', () => {
     ensureAudio();
-    if (state === 'title' || state === 'over') newGame();
-    if (state === 'playing' || state === 'intro') { banner.hidden = true; objects = []; px = lv.safeX(lv.baseY); startCelebration(); }
+    if (state !== 'playing' && state !== 'intro') return;
+    $('skipBtn').blur();
+    level++;
+    lasers = []; particles = [];
+    startLevel();
   });
   $('feedBtn').addEventListener('click', () => { feed = 1; });
 })();
