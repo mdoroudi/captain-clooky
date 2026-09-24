@@ -364,7 +364,8 @@
       decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'], island: ['pine', 'drift'] },
     { key: 'cursed', name: 'Cursed Forest',
       water: '#16301F', streak: '#2E5238', land: '#4E5448', landDot: '#434839', shore: '#7A7440', shoreW: 3, bubbles: true,
-      decor: ['deadtree', 'deadtree', 'deadtree', 'slimerock', 'slimerock', 'embershrub', 'embershrub'], density: 1.6, island: ['slimerock', 'deadtree'] },
+      decor: ['deadtree', 'deadtree', 'deadtree', 'slimerock', 'slimerock', 'embershrub', 'embershrub'], density: 6, decorScale: 2, fill: 1, perRow: 2,
+      island: ['slimerock', 'deadtree', 'embershrub'] },
     { key: 'space', name: 'TB in Space',
       water: '#3A0808', streak: '#5E1A18', land: '#2F5FCF', landDot: '#FFFFFF', shore: '#9FC3FF', shoreW: 2,
       decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars'], island: ['asteroid', 'asteroid'],
@@ -760,10 +761,11 @@
     const decor = trees.slice();   // eagle redwoods first, then random scenery
     const density = theme.density || 1;
     for (let y = 10; y < baseY + 300; y += (14 + rng() * 22) / density) {
-      for (const side of [-1, 1]) {
-        if (rng() < 0.35) continue;
+      for (const side of [-1, 1, ...(theme.perRow > 1 ? [-1, 1] : [])]) {
+        if (rng() > (theme.fill || 0.65)) continue;
         const type = theme.decor[Math.floor(rng() * theme.decor.length)];
-        const [dw, dh] = DECOR_SIZE[type];
+        const sc = theme.decorScale || 1;
+        const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
         if (type === 'vine' || type === 'floe') {   // these hug the shoreline
           decor.push({ type, side, y, x: 0 });
           continue;
@@ -775,22 +777,25 @@
         const x = side < 0 ? 2 + rng() * room : edge + 4 + rng() * room;
         if (y > baseY - 40 && y < baseY + 175) continue;   // room for the fort, hangar and chicken coops
         if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
-        decor.push({ type, side, y, x: Math.round(x) });
+        decor.push({ type, side, y, x: Math.round(x), scale: theme.decorScale || 1 });
       }
     }
     // A little scenery on the islands too (the space level puts Neptune on the first asteroid)
     let firstIslandDecor = theme.islandFirst || null;
     for (const [a, b] of islands) {
-      for (let r = a + 6; r < b - 4; r += 7 + Math.floor(rng() * 5)) {
+      for (let r = a + 6; r < b - 4; r += theme.decorScale ? 3 + Math.floor(rng() * 3) : 7 + Math.floor(rng() * 5)) {
         const type = firstIslandDecor || theme.island[Math.floor(rng() * theme.island.length)];
-        const [dw, dh] = DECOR_SIZE[type];
+        const sc = theme.decorScale || 1;
+        const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
         let l = -1, rr = W + 1;
         for (let k = r; k <= r + Math.ceil(dh / ROW); k++) { if (!hasIsland(k)) { l = W; break; } l = Math.max(l, IL[k]); rr = Math.min(rr, IR[k]); }
         if (rr - l < dw + 6) continue;
-        decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2) });
+        decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2), scale: theme.decorScale || 1 });
         firstIslandDecor = null;
       }
     }
+    // Draw far scenery first so nearer (lower on screen) pieces overlap it
+    decor.sort((a, b) => b.y - a.y);
     return { level, L, R, IL, IR, rows, bankL, bankR, isWater, channel, safeX, wallYs, baseY, plan, decor, theme };
   }
 
@@ -1710,9 +1715,17 @@
     stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16]
   };
   function drawDecor(d) {
-    const y = sy(d.y);
-    if (y < -20 || y > PLAY_H + 20) return;
-    const x = d.x;
+    const sc = d.scale || 1;
+    const sy0 = sy(d.y);
+    if (sy0 < -20 || sy0 > PLAY_H + 20 * sc) return;
+    if (sc === 1) return drawDecorAt(d, d.x, sy0);
+    ctx.save();
+    ctx.translate(d.x, Math.round(sy0));
+    ctx.scale(sc, sc);
+    drawDecorAt(d, 0, 0);
+    ctx.restore();
+  }
+  function drawDecorAt(d, x, y) {
     switch (d.type) {
       case 'barn':
         rect(x, y - 10, 16, 10, '#B83A2E'); rect(x + 1, y - 14, 14, 4, '#7A2A22'); rect(x + 3, y - 15, 10, 1, '#7A2A22');
