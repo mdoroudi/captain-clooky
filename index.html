@@ -221,6 +221,7 @@
     <!-- Test buttons: hidden unless test mode is on (open the game with ?dev=1; ?dev=0 turns it off). -->
     <button class="sound" id="skipBtn" type="button" hidden>Skip level</button>
     <button class="sound" id="feedBtn" type="button" hidden>Full feed</button>
+    <button class="sound" id="tripleBtn" type="button" hidden>Triple</button>
     <button class="sound" id="pauseBtn" type="button" hidden>Pause</button>
     <button class="sound" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
   </div>
@@ -285,6 +286,7 @@
       refillPerSecond: 0.55     // how fast a GRUBS crate refills the meter
     },
     laser: { cooldown: 0.22, speed: 300, length: 18, jamSeconds: 3 },
+    tripleLaser: { every: 1500, seconds: 10, angle: 40 },   // power-up: 3 beams (straight, 40° left, 40° right)
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
@@ -465,6 +467,7 @@
     screech()  { tone(1800, 0.35, 'sawtooth', 0.04, -900); tone(2200, 0.25, 'square', 0.02, -1200, 0.05); },
     chitter()  { [1400, 1700, 1300].forEach((f, i) => tone(f, 0.04, 'square', 0.03, 0, i * 0.05)); },
     splash()   { noise(0.3, 0.08, 2600, 500); },
+    powerUp()  { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.09, 'square', 0.05, 0, 0.35 + i * 0.07)); },
     start()    { tone(523, 0.08, 'square', 0.05); tone(659, 0.08, 'square', 0.05, 0, 0.09); tone(784, 0.12, 'square', 0.05, 0, 0.18); }
   };
 
@@ -472,7 +475,7 @@
   let wind = null;
   function updateWind() {
     if (!audio) return;
-    const flying = soundOn && (state === 'playing' || state === 'intro');
+    const flying = soundOn && (state === 'playing' || state === 'intro' || state === 'celebrate');
     if (flying && !wind) {
       const src = audio.createBufferSource(); src.buffer = getNoise(); src.loop = true;
       const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; lp.Q.value = 0.8;
@@ -694,7 +697,7 @@
         const room = side < 0 ? edge - 6 - dw : W - edge - 6 - dw;
         if (room < 2) continue;
         const x = side < 0 ? 2 + rng() * room : edge + 4 + rng() * room;
-        if (Math.abs(y - baseY) < 40) continue;
+        if (y > baseY - 40 && y < baseY + 175) continue;   // room for the fort, hangar and chicken coops
         if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
         decor.push({ type, side, y, x: Math.round(x) });
       }
@@ -724,6 +727,7 @@
   let dist = 0, px = W / 2, feed = 1, checkpointY = 0;
   let objects = [], lasers = [], particles = [];
   let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
+  let tripleT = 0, nextTripleAt = CONFIG.tripleLaser.every;
   let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
   let refilling = false, deathCause = '';
 
@@ -752,19 +756,29 @@
     return r;
   }
 
+  function startTriple() {
+    tripleT = CONFIG.tripleLaser.seconds;
+    showBanner('Triple laser!', 1.6);
+    sfx.powerUp();
+  }
+
   function addScore(n) {
     score = Math.max(0, score + n);
+    let triple = false;
+    while (score >= nextTripleAt) { nextTripleAt += CONFIG.tripleLaser.every; triple = true; }
     while (score >= nextLifeAt) {
       nextLifeAt += CONFIG.lives.extraEvery;
       if (lives < CONFIG.lives.max) { lives++; showBanner('+1 life!', 1.2); sfx.lifeUp(); }
     }
     const r = rankFor(score);                // rank follows the score, up and down
     if (r > peakRank) peakRank = r;
+    if (triple) { tripleT = CONFIG.tripleLaser.seconds; sfx.powerUp(); }
     if (r > rankIdx) {
-      showBanner('Promoted to ' + CONFIG.ranks[r].name + '!', 1.8);
+      showBanner('Promoted to ' + CONFIG.ranks[r].name + '!' + (triple ? ' Triple laser!' : ''), 2);
       sfx.promote();
       if (r > bestRank) { bestRank = r; saveNum(RANK_KEY, bestRank); }
     }
+    else if (triple) showBanner('Triple laser!', 1.6);
     rankIdx = r;
     if (score > best) { best = score; saveNum(BEST_KEY, best); }
     updateHud();
@@ -814,6 +828,7 @@
   function newGame() {
     ensureAudio();
     level = 1; score = 0; lives = CONFIG.lives.start; nextLifeAt = CONFIG.lives.extraEvery; rankIdx = 0; peakRank = 0;
+    tripleT = 0; nextTripleAt = CONFIG.tripleLaser.every;
     particles = [];
     hideOverlays();
     pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
@@ -828,6 +843,7 @@
     if (state !== 'playing') return;
     deathCause = cause;
     state = 'dying';
+    tripleT = 0;
     timer = 1.7;
     lives--;
     puff(px, dist, 14, true);
@@ -852,6 +868,17 @@
     $('finalBest').textContent = score >= best && score > 0 ? 'New best score!' : 'Best ' + best.toLocaleString() + ' · ' + CONFIG.ranks[bestRank].name;
     overScreen.hidden = false;
     $('continueBtn').focus({ preventScroll: true });
+  }
+
+  // Reaching the base: the river stops and every chicken in the coops jumps and clucks for Clooky
+  function startCelebration() {
+    state = 'celebrate';
+    dist = lv.baseY;
+    timer = 3.2;
+    lasers = [];
+    showBanner('Welcome home, Captain!', 2.6);
+    sfx.levelDone();
+    buk(520, 330, 0.07, 0.2); buk(540, 340, 0.07, 0.34); buk(420, 760, 0.09, 0.5, 0.14); buk(760, 380, 0.22, 0.6, 0.14);
   }
 
   function completeLevel() {
@@ -1047,6 +1074,16 @@
       if (timer <= 0) { if (lives <= 0) gameOver(); else respawn(); }
       return;
     }
+    if (state === 'celebrate') {
+      timer -= dt;
+      if (Math.random() < dt * 7) { const f = 460 + Math.random() * 260; buk(f, f * 0.64, 0.07, 0, 0.07); }   // happy clucks
+      if (Math.random() < dt * 14) {                                                                           // feather confetti
+        const cols = ['#FFFFFF', '#FFD66B', '#F08A4B', '#C98A55', '#2E2E36', '#B98CFF'];
+        particles.push({ kind: 'bit', x: Math.random() * W, wy: dist + PLAYER_Y + 4, vx: (Math.random() - 0.5) * 30, vy: 20 + Math.random() * 25, life: 3, color: cols[Math.floor(Math.random() * cols.length)] });
+      }
+      if (timer <= 0) completeLevel();
+      return;
+    }
     if (state === 'levelDone') {
       timer -= dt;
       if (timer <= 0) nextLevel();
@@ -1080,12 +1117,17 @@
       }
       if (jamT <= 0) showBanner('Laser fixed!', 0.9);
     } else if (held('fire') && fireCooldown <= 0) {
-      lasers.push({ x: px, wy: dist + 14 + CONFIG.laser.length / 2 });
+      const angles = tripleT > 0 ? [-CONFIG.tripleLaser.angle, 0, CONFIG.tripleLaser.angle] : [0];
+      for (const a of angles) {
+        const rad = a * Math.PI / 180;
+        lasers.push({ x: px, wy: dist + 14 + CONFIG.laser.length / 2, vx: Math.sin(rad) * CONFIG.laser.speed, vy: Math.cos(rad) * CONFIG.laser.speed, triple: tripleT > 0 });
+      }
       fireCooldown = CONFIG.laser.cooldown;
       sfx.pew();
     }
-    for (const l of lasers) l.wy += (CONFIG.laser.speed + speedNow) * dt;
-    lasers = lasers.filter(l => sy(l.wy) > -CONFIG.laser.length && !l.used);
+    if (tripleT > 0) tripleT = Math.max(0, tripleT - dt);
+    for (const l of lasers) { l.x += l.vx * dt; l.wy += (l.vy + speedNow) * dt; }
+    lasers = lasers.filter(l => sy(l.wy) > -CONFIG.laser.length && l.x > -20 && l.x < W + 20 && !l.used);
 
     // Objects move
     const D = difficulty(level);
@@ -1162,16 +1204,19 @@
 
     // Laser hits
     for (const l of lasers) {
+      const len = CONFIG.laser.length, ux = l.vx / CONFIG.laser.speed, uy = l.vy / CONFIG.laser.speed;
+      const pts = [0, 0.5, 1].map(f => [l.x - ux * len * f, l.wy - uy * len * f]);   // tip, middle, tail
       for (const o of objects) {
         if (!o.alive || l.used) continue;
         if (o.type === 'wall') {
-          if (Math.abs(l.wy - o.y) < 7 + CONFIG.laser.length / 2 && l.x > lv.bankL(o.y) && l.x < lv.bankR(o.y)) { l.used = true; hitObject(o); }
+          if (pts.some(([x, y]) => Math.abs(y - o.y) < 7 && x > lv.bankL(o.y) && x < lv.bankR(o.y))) { l.used = true; hitObject(o); }
           continue;
         }
         if (o.type === 'crate' && !o.landed) continue;
         if (o.type === 'anaconda' && o.k < 0.3) continue;
+        if (o.type === 'medic' && l.triple) continue;          // triple beams fly right past medic chicks
         const [bw, bh] = HIT[o.type];
-        if (boxHit(l.x, l.wy, 2, CONFIG.laser.length, o.x, hitY(o), bw, bh)) { l.used = true; hitObject(o); }
+        if (pts.some(([x, y]) => boxHit(x, y, 3, 3, o.x, hitY(o), bw, bh))) { l.used = true; hitObject(o); }
       }
     }
     lasers = lasers.filter(l => !l.used);
@@ -1205,7 +1250,7 @@
 
     objects = objects.filter(o => o.alive && o.phase !== 'gone' && sy(o.y) < PLAY_H + 40);
 
-    if (dist >= lv.baseY) completeLevel();
+    if (dist >= lv.baseY) startCelebration();
   }
 
   function steer(dt) {
@@ -1266,7 +1311,8 @@
     rect(x - 10, y + 2 + wo, 3, 2, WING_D); rect(x + 7, y + 2 + wo, 3, 2, WING_D);
     rect(x - 10, y - 1 + wo, 20, 1, C.wingEdge);
     // Blaster pods under the wings
-    rect(x - 7, y - 3 + wo, 2, 3, '#6B5B8C'); rect(x + 5, y - 3 + wo, 2, 3, '#6B5B8C');
+    const pod = tripleT > 0 ? (Math.floor(clock * 8) % 2 ? '#E0CCFF' : '#B98CFF') : '#6B5B8C';
+    rect(x - 7, y - 3 + wo, 2, 3, pod); rect(x + 5, y - 3 + wo, 2, 3, pod);
     // Body and tail
     rect(x - 4, y - 4, 8, 10, BODY);
     rect(x - 3, y - 6, 6, 13, BODY);
@@ -1485,7 +1531,47 @@
     rect(l, s + 6, r - l, 1, '#8E7648');
   }
 
+  // Chicken coops on both banks just past the base; the hens jump and flap during the celebration
+  const COOP_HENS = [
+    { body: '#FFFFFF', wing: '#E6E0D0' }, { body: '#C98A55', wing: '#A86E3E' }, { body: '#2E2E36', wing: '#4A4A56' },
+    { body: '#E8B060', wing: '#C98A42' }, { body: '#8C8C94', wing: '#6E6E78' }, { body: '#B85A2E', wing: '#8A3E1E' }
+  ];
+  function drawCoops() {
+    const party = state === 'celebrate';
+    for (let i = 0; i < 3; i++) {
+      const wy = lv.baseY + 62 + i * 36;
+      const y = sy(wy);
+      if (y < -30 || y > PLAY_H + 20) continue;
+      for (const side of [-1, 1]) {
+        const edge = side < 0 ? lv.bankL(wy) : lv.bankR(wy);
+        const cx = side < 0 ? Math.max(14, edge - 22) : Math.min(W - 14, edge + 22);
+        // Little coop: red roof, wooden walls, dark doorway
+        rect(cx - 9, y - 12, 18, 10, '#A8733A');
+        rect(cx - 11, y - 16, 22, 4, '#B83A2E'); rect(cx - 8, y - 18, 16, 2, '#B83A2E'); rect(cx - 4, y - 19, 8, 1, '#B83A2E');
+        rect(cx - 3, y - 9, 6, 7, '#3A2410');
+        rect(cx - 9, y - 2, 18, 1, '#6E4420');
+        // Two hens in front of each coop
+        for (const k of [-1, 1]) {
+          const hen = COOP_HENS[(i * 2 + (k + 1) / 2 + (side > 0 ? 3 : 0)) % COOP_HENS.length];
+          const phase = i * 1.7 + k * 0.9 + side;
+          const hop = party ? Math.round(Math.abs(Math.sin(clock * 9 + phase)) * 6) : 0;
+          const flap = party && Math.floor(clock * 12 + phase) % 2 === 0;
+          const hx = cx + k * 7, hy = y + 3 - hop;
+          rect(hx - 3, hy - 4, 6, 5, hen.body);                                  // body
+          rect(hx - 2, hy - 7, 4, 3, hen.body);                                  // head
+          rect(hx - 1, hy - 8, 2, 1, '#D62828');                                 // comb
+          rect(hx - 1, hy - 5, 1, 1, '#1A1A1A');                                 // eye
+          rect(hx + (k > 0 ? 2 : -3), hy - 5, 1, 1, '#F2A33A');                  // beak
+          if (flap) { rect(hx - 5, hy - 6, 2, 3, hen.wing); rect(hx + 3, hy - 6, 2, 3, hen.wing); }   // wings up
+          else rect(hx - 2, hy - 3, 4, 2, hen.wing);
+          if (!party || hop < 2) { rect(hx - 2, hy + 1, 1, 1, '#F2A33A'); rect(hx + 1, hy + 1, 1, 1, '#F2A33A'); }
+        }
+      }
+    }
+  }
+
   function drawBase() {
+    drawCoops();
     const y = sy(lv.baseY);
     if (y < -40 || y > PLAY_H + 40) return;
     // Bunting across the river marks the finish
@@ -1638,6 +1724,15 @@
     if (!blinkOff) rect(mx, my, Math.round(mw * clamp(feed, 0, 1)), 8, col);
     rect(mx + mw / 2, my, 1, 8, '#3A3470');
     if (refilling) rect(mx + Math.round(mw * feed) - 1, my - 2, 2, 12, '#FFFFFF');
+    // Triple laser badge and countdown
+    if (tripleT > 0) {
+      const bx = 186, by = PLAY_H + 4;
+      rect(bx, by, 36, 13, '#5B2FA8');
+      sprite(['#.#', '.#.', '#.#'], bx + 6, by + 3, { '#': '#FFF4E0' });
+      sprite(['###', '..#', '.##', '..#', '###'], bx + 11, by + 2, { '#': '#FFF4E0' });
+      for (const a of [-1, 0, 1]) rect(bx + 22 + a * 3, by + 3 + Math.abs(a), 1, 4 - Math.abs(a), '#E0CCFF');   // little fan of beams
+      rect(bx + 2, by + 10, Math.round(32 * tripleT / CONFIG.tripleLaser.seconds), 2, (tripleT < 3 && Math.floor(clock * 6) % 2) ? '#FFF4E0' : '#B98CFF');
+    }
     // Rank badge
     const ins = INSIGNIA[rankIdx];
     rect(W - 26, PLAY_H + 4, 20, 13, '#3A3470');
@@ -1665,15 +1760,20 @@
     }
     // Lasers
     for (const l of lasers) {
-      const y = sy(l.wy);
-      const len = CONFIG.laser.length;
-      ctx.globalAlpha = 0.35; rect(l.x - 2, y - len / 2 - 1, 4, len + 2, '#B98CFF'); ctx.globalAlpha = 1;   // glow
-      rect(l.x - 1, y - len / 2, 2, len, '#9B5CF6');
-      rect(l.x, y - len / 2, 1, len, '#E0CCFF');
+      const len = CONFIG.laser.length, ux = l.vx / CONFIG.laser.speed, uy = l.vy / CONFIG.laser.speed;
+      const tx = l.x, ty = sy(l.wy);                       // tip on screen; the beam trails behind it
+      ctx.globalAlpha = 0.35;
+      for (let i = 0; i <= len; i += 2) rect(tx - ux * i - 2, ty + uy * i - 1, 4, 3, '#B98CFF');   // glow
+      ctx.globalAlpha = 1;
+      for (let i = 0; i <= len; i++) rect(tx - ux * i - 1, ty + uy * i, 2, 1, '#9B5CF6');
+      for (let i = 0; i <= len; i++) rect(tx - ux * i, ty + uy * i, 1, 1, '#E0CCFF');
+      if (l.triple) {                                      // round glowing tip
+        rect(tx - 2, ty - 1, 5, 3, '#E0CCFF'); rect(tx - 1, ty - 2, 3, 5, '#E0CCFF'); rect(tx - 1, ty - 1, 3, 3, '#FFFFFF');
+      }
     }
     // Clooky
     const showPlayer = state !== 'dying' && state !== 'title' && state !== 'over' && !(invulnT > 0 && Math.floor(clock * 12) % 2 === 0);
-    if (showPlayer) drawClooky(Math.round(px), PLAYER_Y);
+    if (showPlayer) drawClooky(Math.round(px), PLAYER_Y + (state === 'celebrate' ? Math.round(Math.sin(clock * 6) * 2) : 0));
     // Things in the air
     for (const o of objects) {
       if (!o.alive) continue;
@@ -1742,10 +1842,12 @@
   }
   $('skipBtn').hidden = !devMode;
   $('feedBtn').hidden = !devMode;
+  $('tripleBtn').hidden = !devMode;
+  $('tripleBtn').addEventListener('click', () => { if (state === 'playing' || state === 'intro') startTriple(); });
   $('skipBtn').addEventListener('click', () => {
     ensureAudio();
     if (state === 'title' || state === 'over') newGame();
-    if (state === 'playing' || state === 'intro') { banner.hidden = true; completeLevel(); }
+    if (state === 'playing' || state === 'intro') { banner.hidden = true; objects = []; px = lv.safeX(lv.baseY); startCelebration(); }
   });
   $('feedBtn').addEventListener('click', () => { feed = 1; });
 })();
