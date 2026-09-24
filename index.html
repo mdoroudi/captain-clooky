@@ -301,7 +301,7 @@
       refillPerSecond: 0.55     // how fast a GRUBS crate refills the meter
     },
     laser: { cooldown: 0.22, speed: 300, length: 18, jamSeconds: 3 },
-    tripleLaser: { every: 1000, seconds: 10, angle: 40 },   // power-up: 3 beams (straight, 40° left, 40° right)
+    tripleLaser: { every: 1000, secondsPer1000: 10, angle: 40 },   // power-up: 3 beams; lasts 10 s at 1,000 points, 20 s at 2,000, 30 s at 3,000...
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
@@ -796,7 +796,7 @@
   let dist = 0, px = W / 2, feed = 1, checkpointY = 0;
   let objects = [], lasers = [], particles = [];
   let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
-  let tripleT = 0, nextTripleAt = CONFIG.tripleLaser.every;
+  let tripleT = 0, tripleMax = 1, nextTripleAt = CONFIG.tripleLaser.every;
   let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
   let refilling = false, deathCause = '';
 
@@ -826,23 +826,25 @@
     return r;
   }
 
-  function startTriple() {
-    tripleT = CONFIG.tripleLaser.seconds;
+  // Power-up length grows with the milestone reached: 1,000 points -> 10 s, 2,000 -> 20 s, 3,000 -> 30 s...
+  const tripleSecondsAt = points => (points / 1000) * CONFIG.tripleLaser.secondsPer1000;
+  function startTriple(secs = tripleSecondsAt(Math.max(CONFIG.tripleLaser.every, nextTripleAt - CONFIG.tripleLaser.every))) {
+    tripleT = tripleMax = secs;
     showBanner('Triple laser!', 1.6);
     sfx.powerUp();
   }
 
   function addScore(n) {
     score = Math.max(0, score + n);
-    let triple = false;
-    while (score >= nextTripleAt) { nextTripleAt += CONFIG.tripleLaser.every; triple = true; }
+    let triple = 0;                         // seconds of power-up earned by this score change (0 = none)
+    while (score >= nextTripleAt) { triple = tripleSecondsAt(nextTripleAt); nextTripleAt += CONFIG.tripleLaser.every; }
     while (score >= nextLifeAt) {
       nextLifeAt += CONFIG.lives.extraEvery;
       if (lives < CONFIG.lives.max) { lives++; showBanner('+1 life!', 1.2); sfx.lifeUp(); }
     }
     const r = rankFor(score);                // rank follows the score, up and down
     if (r > peakRank) peakRank = r;
-    if (triple) { tripleT = CONFIG.tripleLaser.seconds; sfx.powerUp(); }
+    if (triple) { tripleT = tripleMax = triple; sfx.powerUp(); }
     if (r > rankIdx) {
       showBanner('Promoted to ' + CONFIG.ranks[r].name + '!' + (triple ? ' Triple laser!' : ''), 2);
       sfx.promote();
@@ -1813,7 +1815,7 @@
       sprite(['#.#', '.#.', '#.#'], bx + 6, by + 3, { '#': '#FFF4E0' });
       sprite(['###', '..#', '.##', '..#', '###'], bx + 11, by + 2, { '#': '#FFF4E0' });
       for (const a of [-1, 0, 1]) rect(bx + 22 + a * 3, by + 3 + Math.abs(a), 1, 4 - Math.abs(a), '#E0CCFF');   // little fan of beams
-      rect(bx + 2, by + 10, Math.round(32 * tripleT / CONFIG.tripleLaser.seconds), 2, (tripleT < 3 && Math.floor(clock * 6) % 2) ? '#FFF4E0' : '#B98CFF');
+      rect(bx + 2, by + 10, Math.round(32 * tripleT / tripleMax), 2, (tripleT < 3 && Math.floor(clock * 6) % 2) ? '#FFF4E0' : '#B98CFF');
     }
     // Rank badge
     const ins = INSIGNIA[rankIdx];
