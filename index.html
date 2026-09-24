@@ -85,6 +85,15 @@
     padding: 0.15em 0.6em;
     cursor: pointer;
   }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.4em; height: 1.8em; padding: 0; }
+  .icon-btn svg { width: 1.15em; height: 1.15em; display: block; }
+  .devbar {
+    width: var(--w, 100%);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.8em;
+    color: var(--hud-ink); font-size: clamp(11px, 1.8vmin, 15px);
+    flex-shrink: 0; opacity: 0.8;
+  }
+  .devbar[hidden] { display: none; }
   .sound:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
   .stage {
     position: relative;
@@ -219,14 +228,10 @@
   <div class="hud" aria-live="polite">
     <span>Score <b id="score">0</b></span>
     <span id="rank">Private</span>
-    <span class="wide-only" id="levelName">Farm River</span>
+    <span>Level <b id="levelNum">1</b><span class="wide-only" id="levelName"> · Farm River</span></span>
     <span class="spacer"></span>
-    <!-- Test buttons: hidden unless test mode is on (open the game with ?dev=1; ?dev=0 turns it off). -->
-    <button class="sound" id="skipBtn" type="button" hidden>Skip level</button>
-    <button class="sound" id="feedBtn" type="button" hidden>Full feed</button>
-    <button class="sound" id="tripleBtn" type="button" hidden>Triple</button>
-    <button class="sound" id="pauseBtn" type="button" hidden>Pause</button>
-    <button class="sound" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
+    <button class="sound icon-btn" id="pauseBtn" type="button" aria-label="Pause" hidden></button>
+    <button class="sound icon-btn" id="soundBtn" type="button" aria-pressed="true" aria-label="Sound on"></button>
   </div>
   <div class="stage" id="stage">
     <canvas id="game" aria-label="Captain Clooky game area"></canvas>
@@ -259,6 +264,13 @@
       <h2>Paused</h2>
       <button class="play" id="resumeBtn" type="button">Keep flying</button>
     </div>
+  </div>
+  <!-- Test buttons: hidden unless test mode is on (open the game with ?dev=1; ?dev=0 turns it off). -->
+  <div class="devbar" id="devbar" hidden>
+    <span>Test:</span>
+    <button class="sound" id="skipBtn" type="button">Skip level</button>
+    <button class="sound" id="feedBtn" type="button">Full feed</button>
+    <button class="sound" id="tripleBtn" type="button">Triple</button>
   </div>
   <div class="touch-pad" id="touchPad" aria-hidden="true">
     <div class="pad-group">
@@ -367,7 +379,7 @@
 
   const $ = id => document.getElementById(id);
   const stage = $('stage'), cabinet = $('cabinet');
-  const scoreEl = $('score'), rankEl = $('rank'), levelNameEl = $('levelName');
+  const scoreEl = $('score'), rankEl = $('rank'), levelNameEl = $('levelName'), levelNumEl = $('levelNum');
   const titleScreen = $('titleScreen'), overScreen = $('overScreen'), pauseScreen = $('pauseScreen'), levelScreen = $('levelScreen');
   const banner = $('banner'), soundBtn = $('soundBtn'), pauseBtn = $('pauseBtn');
 
@@ -383,7 +395,8 @@
     const padW = side ? 2 * 190 : 0;
     const availW = vw - 16 - padW;
     const hudH = document.querySelector('.hud').offsetHeight || 32;
-    const availH = vh - 16 - hudH - 8 - padH;
+    const devH = $('devbar').hidden ? 0 : $('devbar').offsetHeight + 8;
+    const availH = vh - 16 - hudH - 8 - devH - padH;
     const s = Math.max(0.5, Math.min(availW / W, availH / H));
     const w = Math.floor(W * s), h = Math.floor(H * s);
     document.documentElement.style.setProperty('--w', w + 'px');
@@ -501,10 +514,27 @@
     wind.hum.frequency.setTargetAtTime(58 + 40 * k, t, 0.15);
   }
 
+  // Icon buttons: pause / play and speaker on / off
+  const ICONS = {
+    pause: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="4" height="12" fill="currentColor"/><rect x="9" y="2" width="4" height="12" fill="currentColor"/></svg>',
+    play: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2l10 6-10 6z" fill="currentColor"/></svg>',
+    soundOn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 6h3l4-4v12l-4-4H1z" fill="currentColor"/><path d="M10.5 5.5a3.5 3.5 0 010 5M12.5 3.5a6.3 6.3 0 010 9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+    soundOff: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 6h3l4-4v12l-4-4H1z" fill="currentColor"/><path d="M10.5 5.5l4 5M14.5 5.5l-4 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+  };
+  function setPauseIcon(paused) {
+    pauseBtn.innerHTML = paused ? ICONS.play : ICONS.pause;
+    pauseBtn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  }
+  function setSoundIcon() {
+    soundBtn.innerHTML = soundOn ? ICONS.soundOn : ICONS.soundOff;
+    soundBtn.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off');
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+  }
+  setPauseIcon(false); setSoundIcon();
+
   soundBtn.addEventListener('click', () => {
     soundOn = !soundOn;
-    soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
-    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    setSoundIcon();
     ensureAudio();
   });
 
@@ -775,7 +805,8 @@
   function updateHud() {
     scoreEl.textContent = score.toLocaleString();
     rankEl.textContent = CONFIG.ranks[rankIdx].name;
-    levelNameEl.textContent = lv ? lv.theme.name : THEMES[0].name;
+    levelNumEl.textContent = level;
+    levelNameEl.textContent = ' · ' + (lv ? lv.theme.name : THEMES[0].name);
   }
   function refreshTitleBest() {
     $('titleBest').textContent = 'Best ' + best.toLocaleString() + ' · ' + CONFIG.ranks[bestRank].name;
@@ -870,7 +901,7 @@
     tripleT = 0; nextTripleAt = CONFIG.tripleLaser.every;
     particles = [];
     hideOverlays();
-    pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
+    pauseBtn.hidden = false; setPauseIcon(false);
     fit();
     sfx.start();
     startLevel();
@@ -1036,14 +1067,15 @@
     if (state === 'paused') {
       state = resumeState;
       pauseScreen.hidden = true;
-      pauseBtn.textContent = 'Pause';
+      setPauseIcon(false);
       ensureAudio();
     } else if (state === 'playing' || state === 'intro' || state === 'dying' || state === 'levelDone') {
       if (state === 'levelDone') return;
       resumeState = state;
       state = 'paused';
       pauseScreen.hidden = false;
-      pauseBtn.textContent = 'Resume';
+      setPauseIcon(true);
+      banner.hidden = true;
       $('resumeBtn').focus({ preventScroll: true });
     }
   }
@@ -1890,10 +1922,8 @@
   } catch (e) {
     devMode = new URLSearchParams(location.search).get('dev') === '1';
   }
-  $('skipBtn').hidden = !devMode;
+  $('devbar').hidden = !devMode;
   requestAnimationFrame(fit);
-  $('feedBtn').hidden = !devMode;
-  $('tripleBtn').hidden = !devMode;
   $('tripleBtn').addEventListener('click', () => { if (state === 'playing' || state === 'intro') startTriple(); });
   $('skipBtn').addEventListener('click', () => {
     ensureAudio();
