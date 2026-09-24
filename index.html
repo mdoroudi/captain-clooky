@@ -361,7 +361,10 @@
       decor: ['cactus', 'cactus', 'rock', 'rock', 'mesa', 'bones'], island: ['cactus', 'rock'] },
     { key: 'ice',    name: 'Icy River',
       water: '#4F9FD6', streak: '#BFE3F7', land: '#F4F8FC', landDot: '#DCE9F3', shore: '#BFD9EA', shoreW: 3,
-      decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'], island: ['pine', 'drift'] }
+      decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'], island: ['pine', 'drift'] },
+    { key: 'cursed', name: 'Cursed Forest',
+      water: '#16301F', streak: '#2E5238', land: '#4E5448', landDot: '#434839', shore: '#7A7440', shoreW: 3, bubbles: true,
+      decor: ['deadtree', 'deadtree', 'deadtree', 'slimerock', 'slimerock', 'embershrub', 'embershrub'], density: 1.6, island: ['slimerock', 'deadtree'] }
   ];
   const themeFor = level => THEMES[(level - 1) % THEMES.length];
 
@@ -1685,7 +1688,8 @@
     barn: [16, 14], hay: [8, 6], fence: [14, 5], tree: [10, 12], flowers: [8, 4],
     jtree: [14, 14], palm: [11, 13], fern: [9, 6], vine: [3, 10],
     cactus: [7, 11], rock: [9, 5], mesa: [14, 8], bones: [8, 3],
-    pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36]
+    pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36],
+    slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7]
   };
   function drawDecor(d) {
     const y = sy(d.y);
@@ -1748,6 +1752,16 @@
         rect(x + 5, y - 33, 4, 3, '#1F5A36');
         break;
       }
+      case 'slimerock':   // gray rock with green sludge dripping down it
+        rect(x, y - 6, 11, 6, '#6E7270'); rect(x + 1, y - 7, 8, 1, '#8A8E8C'); rect(x, y - 1, 11, 1, '#4E5250');
+        rect(x + 1, y - 7, 5, 1, '#7ACC3A'); rect(x + 2, y - 6, 2, 3, '#7ACC3A'); rect(x + 6, y - 6, 3, 1, '#5EA82E');
+        rect(x + 7, y - 5, 1, 3, '#7ACC3A'); rect(x + 9, y - 4, 1, 2, '#5EA82E'); break;
+      case 'deadtree':    // dark gray trunk, very dark green leaves
+        rect(x + 5, y - 8, 2, 8, '#3A3A3E'); rect(x + 3, y - 9, 2, 1, '#3A3A3E'); rect(x + 7, y - 10, 2, 1, '#3A3A3E');
+        rect(x + 1, y - 15, 10, 6, '#12301C'); rect(x, y - 13, 12, 3, '#12301C'); rect(x + 3, y - 14, 3, 2, '#1C4428'); rect(x + 7, y - 12, 2, 1, '#1C4428'); break;
+      case 'embershrub':  // round shrub: red outside, orange inside
+        rect(x + 1, y - 7, 7, 7, '#C0281E'); rect(x, y - 6, 9, 5, '#C0281E');
+        rect(x + 2, y - 5, 5, 3, '#F2872A'); rect(x + 3, y - 6, 3, 5, '#F2872A'); rect(x + 4, y - 4, 1, 1, '#FFC04A'); break;
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
         rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
@@ -1766,6 +1780,10 @@
       const rc = Math.max(0, r);                   // below the start line, reuse the first row
       const top = Math.round(sy((r + 1) * ROW)), l = lv.L[rc], rr = lv.R[rc];
       // Water sparkle streaks
+      if (T.bubbles && ((r + 1000) * 71) % 23 === 0) {          // murky swamp bubbles
+        const bx = l + (((r + 1000) * 17) % Math.max(1, rr - l - 6)) + 3, pop = Math.floor(clock * 2 + r) % 3;
+        if (pop < 2) { rect(bx, top, 3, 1, T.streak); rect(bx - 1, top + 1, 1, 1, T.streak); rect(bx + 3, top + 1, 1, 1, T.streak); rect(bx, top + 2, 3, 1, T.streak); }
+      }
       if (((r + 1000) * 37) % 9 === 0) rect(l + (((r + 1000) * 53) % Math.max(1, rr - l - 8)) + 2, top + 1, 6, 1, T.streak);
       // Banks
       rect(0, top, l, ROW, T.land);
