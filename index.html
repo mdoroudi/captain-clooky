@@ -248,10 +248,7 @@
       <p class="big-score" id="finalScore">Score 0</p>
       <p id="finalRank">Rank reached: Private</p>
       <p id="finalBest"></p>
-      <div class="buttons">
-        <button class="play" id="continueBtn" type="button">Restart level</button>
-        <button class="play quiet" id="titleBtn" type="button">Back to title</button>
-      </div>
+      <button class="play" id="continueBtn" type="button">Play again</button>
     </div>
 
     <div class="overlay" id="pauseScreen" hidden>
@@ -823,26 +820,8 @@
     startLevel();
   }
 
-  // Continue after game over: same level, fresh lives, score back to zero
-  function continueGame() {
-    ensureAudio();
-    score = 0; lives = CONFIG.lives.start; nextLifeAt = CONFIG.lives.extraEvery; rankIdx = 0; peakRank = 0;
-    particles = [];
-    hideOverlays();
-    pauseBtn.hidden = false; pauseBtn.textContent = 'Pause';
-    sfx.start();
-    startLevel();
-  }
-
-  function backToTitle() {
-    hideOverlays();
-    state = 'title';
-    titleScreen.hidden = false;
-    pauseBtn.hidden = true;
-    banner.hidden = true;
-    refreshTitleBest();
-    $('playBtn').focus({ preventScroll: true });
-  }
+  // Game over works like the original River Raid: play again from Level 1
+  function continueGame() { newGame(); }
 
   function die(cause) {
     if (state !== 'playing') return;
@@ -1745,7 +1724,6 @@
   // =====================================================================
   $('playBtn').addEventListener('click', newGame);
   $('continueBtn').addEventListener('click', continueGame);
-  $('titleBtn').addEventListener('click', backToTitle);
   $('nextBtn').addEventListener('click', nextLevel);
   $('resumeBtn').addEventListener('click', togglePause);
   titleScreen.addEventListener('pointerdown', e => { if (e.target === titleScreen) { e.preventDefault(); newGame(); } });
