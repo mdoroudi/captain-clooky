@@ -368,7 +368,7 @@
       island: ['slimerock', 'deadtree', 'embershrub'] },
     { key: 'space', name: 'TB in Space',
       water: '#3A0808', streak: '#5E1A18', land: '#2F5FCF', landDot: '#FFFFFF', shore: '#9FC3FF', shoreW: 2,
-      decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars'], island: ['asteroid', 'asteroid'],
+      decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars', 'alien', 'alien', 'alien'], island: ['asteroid', 'asteroid'],
       islandFirst: 'neptuneRock' }
   ];
   const themeFor = level => THEMES[(level - 1) % THEMES.length];
@@ -1712,7 +1712,7 @@
     pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36],
     slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7],
     mercury: [7, 7], venus: [9, 9], earth: [9, 9], mars: [7, 7], jupiter: [15, 15], saturn: [17, 11], uranus: [9, 9], neptune: [9, 9],
-    stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16]
+    stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16], alien: [11, 14]
   };
   function drawDecor(d) {
     const sc = d.scale || 1;
@@ -1811,6 +1811,21 @@
       case 'stars':
         rect(x, y - 2, 1, 1, '#FFFFFF'); rect(x + 4, y - 5, 1, 1, '#FFF1A0'); rect(x + 8, y - 1, 1, 1, '#FFFFFF');
         if (Math.floor(clock * 3 + d.y) % 2) { rect(x + 3, y - 5, 3, 1, '#FFF1A0'); rect(x + 4, y - 6, 1, 3, '#FFF1A0'); } break;
+      case 'alien': {     // friendly pink alien waving from the bank
+        const wave = Math.floor(clock * 3 + d.y) % 2 === 0;
+        const P = '#FF7EC8', PD = '#D44C9E';
+        rect(x + 2, y - 13, 1, 3, PD); rect(x + 8, y - 13, 1, 3, PD);              // antennae
+        rect(x + 1, y - 14, 2, 1, '#FFE066'); rect(x + 8, y - 14, 2, 1, '#FFE066'); // bobbles
+        rect(x + 2, y - 11, 7, 5, P); rect(x + 1, y - 10, 9, 3, P);                 // big head
+        rect(x + 3, y - 9, 2, 2, '#1A1A2E'); rect(x + 6, y - 9, 2, 2, '#1A1A2E');   // eyes
+        rect(x + 3, y - 9, 1, 1, '#FFFFFF'); rect(x + 6, y - 9, 1, 1, '#FFFFFF');
+        rect(x + 4, y - 7, 3, 1, PD);                                               // smile
+        rect(x + 3, y - 6, 5, 4, P); rect(x + 4, y - 5, 3, 2, PD);                  // body
+        rect(x + 3, y - 2, 2, 2, PD); rect(x + 6, y - 2, 2, 2, PD);                 // feet
+        rect(x + 1, y - 5, 2, 1, P);                                                // left arm
+        if (wave) rect(x + 8, y - 8, 1, 3, P); else rect(x + 8, y - 5, 2, 1, P);   // right arm waves
+        break;
+      }
       case 'asteroid':
         rect(x + 1, y - 7, 9, 7, '#7A7470'); rect(x, y - 5, 11, 4, '#7A7470'); rect(x + 2, y - 8, 6, 1, '#948E88');
         rect(x + 3, y - 5, 2, 2, '#5C5652'); rect(x + 7, y - 3, 2, 1, '#5C5652'); break;
