@@ -364,7 +364,11 @@
       decor: ['pine', 'pine', 'pine', 'drift', 'drift', 'floe', 'floe', 'igloo'], island: ['pine', 'drift'] },
     { key: 'cursed', name: 'Cursed Forest',
       water: '#16301F', streak: '#2E5238', land: '#4E5448', landDot: '#434839', shore: '#7A7440', shoreW: 3, bubbles: true,
-      decor: ['deadtree', 'deadtree', 'deadtree', 'slimerock', 'slimerock', 'embershrub', 'embershrub'], density: 1.6, island: ['slimerock', 'deadtree'] }
+      decor: ['deadtree', 'deadtree', 'deadtree', 'slimerock', 'slimerock', 'embershrub', 'embershrub'], density: 1.6, island: ['slimerock', 'deadtree'] },
+    { key: 'space', name: 'TB in Space',
+      water: '#E8C23A', streak: '#FFF1A0', land: '#2F5FCF', landDot: '#FFFFFF', shore: '#9FC3FF', shoreW: 2,
+      decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars'], island: ['asteroid', 'asteroid'],
+      islandFirst: 'neptuneRock' }
   ];
   const themeFor = level => THEMES[(level - 1) % THEMES.length];
 
@@ -774,15 +778,17 @@
         decor.push({ type, side, y, x: Math.round(x) });
       }
     }
-    // A little scenery on the islands too
+    // A little scenery on the islands too (the space level puts Neptune on the first asteroid)
+    let firstIslandDecor = theme.islandFirst || null;
     for (const [a, b] of islands) {
       for (let r = a + 6; r < b - 4; r += 7 + Math.floor(rng() * 5)) {
-        const type = theme.island[Math.floor(rng() * theme.island.length)];
+        const type = firstIslandDecor || theme.island[Math.floor(rng() * theme.island.length)];
         const [dw, dh] = DECOR_SIZE[type];
         let l = -1, rr = W + 1;
         for (let k = r; k <= r + Math.ceil(dh / ROW); k++) { if (!hasIsland(k)) { l = W; break; } l = Math.max(l, IL[k]); rr = Math.min(rr, IR[k]); }
         if (rr - l < dw + 6) continue;
         decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2) });
+        firstIslandDecor = null;
       }
     }
     return { level, L, R, IL, IR, rows, bankL, bankR, isWater, channel, safeX, wallYs, baseY, plan, decor, theme };
@@ -1339,6 +1345,16 @@
   //  Drawing helpers
   // =====================================================================
   function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+  function disc(cx, cy, r, c) {                 // filled pixel circle
+    for (let dy = -r; dy <= r; dy++) {
+      const w = Math.round(Math.sqrt(r * r - dy * dy));
+      rect(cx - w, cy + dy, w * 2 + 1, 1, c);
+    }
+  }
+  function planet(cx, cy, r, c) {               // a disc with a dark outline, so it shows on the blue grass
+    disc(cx, cy, r + 1, '#14204A');
+    disc(cx, cy, r, c);
+  }
   function line(x0, y0, x1, y1, c) {
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1;
     for (let i = 0; i <= n; i++) rect(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 1, 1, c);
@@ -1689,7 +1705,9 @@
     jtree: [14, 14], palm: [11, 13], fern: [9, 6], vine: [3, 10],
     cactus: [7, 11], rock: [9, 5], mesa: [14, 8], bones: [8, 3],
     pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36],
-    slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7]
+    slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7],
+    mercury: [7, 7], venus: [9, 9], earth: [9, 9], mars: [7, 7], jupiter: [15, 15], saturn: [17, 11], uranus: [9, 9], neptune: [9, 9],
+    stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16]
   };
   function drawDecor(d) {
     const y = sy(d.y);
@@ -1762,6 +1780,30 @@
       case 'embershrub':  // round shrub: red outside, orange inside
         rect(x + 1, y - 7, 7, 7, '#C0281E'); rect(x, y - 6, 9, 5, '#C0281E');
         rect(x + 2, y - 5, 5, 3, '#F2872A'); rect(x + 3, y - 6, 3, 5, '#F2872A'); rect(x + 4, y - 4, 1, 1, '#FFC04A'); break;
+      // ---- TB in Space: the planets, stars and asteroids ----
+      case 'mercury': planet(x + 3, y - 4, 3, '#9A9A9A'); rect(x + 2, y - 5, 1, 1, '#7A7A7A'); rect(x + 4, y - 3, 1, 1, '#7A7A7A'); break;
+      case 'venus':   planet(x + 4, y - 5, 4, '#E8C98A'); rect(x + 1, y - 5, 7, 1, '#D6B070'); rect(x + 2, y - 7, 3, 1, '#F4DDA8'); break;
+      case 'earth':
+        planet(x + 4, y - 5, 4, '#2E6FD8'); rect(x + 2, y - 7, 3, 2, '#3FAA4A'); rect(x + 5, y - 4, 2, 3, '#3FAA4A'); rect(x + 3, y - 9, 3, 1, '#FFFFFF'); break;
+      case 'mars':    planet(x + 3, y - 4, 3, '#C1440E'); rect(x + 2, y - 6, 2, 1, '#E0703A'); rect(x + 4, y - 3, 1, 1, '#8A2E08'); break;
+      case 'jupiter':
+        planet(x + 7, y - 8, 7, '#D9B38C');
+        for (const [dy, c] of [[-12, '#B5835A'], [-9, '#C99B6E'], [-6, '#B5835A'], [-3, '#C99B6E']]) rect(x + 1, y + dy, 13, 1, c);
+        rect(x + 8, y - 6, 3, 2, '#C0503A'); break;
+      case 'saturn':
+        planet(x + 8, y - 5, 4, '#E3C87A'); rect(x + 5, y - 7, 6, 1, '#D0B060');
+        rect(x, y - 5, 17, 1, '#C8B06A'); rect(x + 1, y - 4, 15, 1, '#F0DDA0'); rect(x + 5, y - 5, 7, 1, '#E3C87A'); break;
+      case 'uranus':  planet(x + 4, y - 5, 4, '#9FE3E8'); rect(x + 4, y - 9, 1, 9, '#C8F2F4'); break;
+      case 'neptune': planet(x + 4, y - 5, 4, '#3A5FE0'); rect(x + 1, y - 6, 7, 1, '#6E8CFF'); rect(x + 5, y - 3, 2, 1, '#22358A'); break;
+      case 'stars':
+        rect(x, y - 2, 1, 1, '#FFFFFF'); rect(x + 4, y - 5, 1, 1, '#FFF1A0'); rect(x + 8, y - 1, 1, 1, '#FFFFFF');
+        if (Math.floor(clock * 3 + d.y) % 2) { rect(x + 3, y - 5, 3, 1, '#FFF1A0'); rect(x + 4, y - 6, 1, 3, '#FFF1A0'); } break;
+      case 'asteroid':
+        rect(x + 1, y - 7, 9, 7, '#7A7470'); rect(x, y - 5, 11, 4, '#7A7470'); rect(x + 2, y - 8, 6, 1, '#948E88');
+        rect(x + 3, y - 5, 2, 2, '#5C5652'); rect(x + 7, y - 3, 2, 1, '#5C5652'); break;
+      case 'neptuneRock':   // Neptune sitting on top of an asteroid
+        rect(x + 1, y - 7, 9, 7, '#7A7470'); rect(x, y - 5, 11, 4, '#7A7470'); rect(x + 3, y - 4, 2, 2, '#5C5652');
+        planet(x + 5, y - 12, 4, '#3A5FE0'); rect(x + 2, y - 13, 7, 1, '#6E8CFF'); rect(x + 6, y - 10, 2, 1, '#22358A'); break;
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
         rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
