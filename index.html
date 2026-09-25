@@ -892,6 +892,7 @@
   let objects = [], lasers = [], particles = [];
   let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
   let bumpT = 0;   // time left in a riverbank bump (the river pauses, no steering)
+  let flashT = 0;  // time left in the river's red flash after a sandbag wall blows up
   let tripleT = 0, tripleMax = 1, nextTripleAt = CONFIG.tripleLaser.every;
   let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
   let refilling = false, deathCause = '';
@@ -987,7 +988,7 @@
     dist = y;
     px = lv.safeX(dist);
     feed = 1;
-    lasers = []; jamT = 0; fireCooldown = 0; bumpT = 0;
+    lasers = []; jamT = 0; fireCooldown = 0; bumpT = 0; flashT = 0;
     spawnObjectsFrom(dist);
   }
 
@@ -1214,6 +1215,7 @@
       checkpointY = o.y;
       addScore(P.wall);
       sfx.boom();
+      flashT = 0.35;   // big explosion: the river flashes red, like River Raid's bridges
       for (let x = lv.bankL(o.y) + 6; x < lv.bankR(o.y); x += 12) {
         puff(x, o.y, 2, false, ['#C8B07A', '#8E7648', '#E2CFA0']);
       }
@@ -1254,6 +1256,7 @@
 
   function update(dt) {
     clock += dt;
+    if (flashT > 0) flashT -= dt;
     for (const p of particles) {
       p.x += p.vx * dt; p.wy -= p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt;
     }
@@ -2088,7 +2091,8 @@
   // =====================================================================
   function drawRiver() {
     const T = lv.theme;
-    rect(0, 0, W, PLAY_H, T.water);
+    const flashing = flashT > 0;
+    rect(0, 0, W, PLAY_H, flashing ? (Math.floor(flashT * 20) % 2 ? '#D8261E' : '#F0602A') : T.water);
     const r0 = Math.floor((dist - (PLAY_H - PLAYER_Y) - ROW) / ROW);   // may be negative near the start
     const r1 = Math.min(lv.rows - 1, Math.ceil((dist + PLAYER_Y + ROW) / ROW));
     for (let r = r0; r <= r1; r++) {
