@@ -389,8 +389,8 @@
       enemies: { raccoon: 0, alien: 4.5 } },  // red aliens take the raccoons' place
     { key: 'autumn', name: 'Autumn Rapids',       // light blue river with a strong current, red autumn trees
       water: '#1C3F86', streak: '#5A86C8', current: '#F2F8FF', rapids: true,   // dark blue river, white rapids
-      land: '#8A4A1E', landDot: '#6A3414', shore: '#4A2A10', shoreW: 2,
-      leafLitter: ['#D2601E', '#E8781E', '#B8481A', '#F09A34', '#9A3A14', '#F4B03A'], litterDensity: 2.5,   // a thick carpet of big autumn leaves
+      land: '#7A4220', landDot: '#7A4220', shore: '#4A2A10', shoreW: 2,
+      patches: ['#7A4220', '#B4561C'],   // ground: an uneven checkerboard of brown and dark orange
       leaves: '#D8261E',                                 // the eagles' pine trees turn red too
       decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, clusters: true,   // big trees in clusters, with grass between
       scatter: ['boulder', 'boulder', 'boulder', 'autumnshrub', 'autumnshrub'], scatterFill: 0.9, scatterGap: 10,   // lots of gray boulders, some shrubs
@@ -2080,14 +2080,8 @@
       rect(rr, top, W - rr, ROW, T.land);
       const k = r + 1000;                          // keep the texture pattern positive below the start line
       if ((k * 13) % 5 === 0) { rect((k * 29) % Math.max(1, l - 2), top + 1, 2, 1, T.landDot); rect(rr + 2 + (k * 31) % Math.max(1, W - rr - 4), top + 2, 2, 1, T.landDot); }
-      if (T.leafLitter && T.litterDensity) {                   // a carpet of big fallen leaves covering the ground
-        const leaf = (x, y, c) => { rect(x, y, 3, 2, c); rect(x + 1, y - 1, 1, 1, c); };
-        for (const [a, b] of [[0, l - T.shoreW - 3], [rr + T.shoreW, W - 3]]) {
-          for (let e = 0, n = Math.floor((b - a) / T.litterDensity); e < n; e++) {
-            const h = Math.imul(k * 73 + e * 131, 2654435761) >>> 0;
-            leaf(a + h % Math.max(1, b - a), top + (h >>> 8) % 3, T.leafLitter[(h >>> 12) % T.leafLitter.length]);
-          }
-        }
+      if (T.patches) {                                         // uneven two-tone checkerboard on the ground
+        for (const [a, b] of [[0, l - T.shoreW], [rr + T.shoreW, W]]) patchRow(a, b, top, k, T.patches);
       } else if (T.leafLitter && (k * 7) % 3 === 0) {            // a few fallen leaves on the grass
         const c = T.leafLitter[k % T.leafLitter.length];
         if (l > 6) rect((k * 37) % (l - 4), top + 1, 2, 1, c);
@@ -2101,13 +2095,7 @@
         rect(il, top, Math.min(T.shoreW, ir - il), ROW, T.shore);
         rect(Math.max(il, ir - T.shoreW), top, Math.min(T.shoreW, ir - il), ROW, T.shore);
         if ((k * 7) % 4 === 0 && ir - il > 10) rect(il + 3 + (k * 11) % (ir - il - 6), top + 1, 2, 1, T.landDot);
-        if (T.leafLitter && T.litterDensity && ir - il > 10) {
-          for (let e = 0, n = Math.floor((ir - il - 8) / T.litterDensity); e < n; e++) {
-            const h = Math.imul(k * 59 + e * 97, 2654435761) >>> 0;
-            const lx = il + 4 + h % Math.max(1, ir - il - 10), c = T.leafLitter[(h >>> 12) % T.leafLitter.length];
-            rect(lx, top + (h >>> 8) % 3, 3, 2, c); rect(lx + 1, top + (h >>> 8) % 3 - 1, 1, 1, c);
-          }
-        }
+        if (T.patches && ir - il > 6) patchRow(il + T.shoreW, ir - T.shoreW, top, k, T.patches);
       }
     }
   }
@@ -2139,6 +2127,21 @@
     for (let dy = -r; dy <= r; dy++) { const half = Math.round(Math.sqrt(r * r - dy * dy)); rect(cx - half, cy + dy, 6, 1, '#0E1538'); }
     ctx.globalAlpha = 1;
     ctx.restore();
+  }
+
+  // One 4-pixel row of an uneven checkerboard: patches of varying width that swap color each row pair,
+  // with a random nudge so the grid never looks too regular.
+  function patchRow(a, b, top, k, colors) {
+    const band = Math.floor(k / 2);                       // patches are two rows (8 pixels) tall
+    let x = a - (Math.imul(band, 40503) >>> 0) % 12;      // each band starts at a different offset
+    for (let i = 0; x < b; i++) {
+      const h = Math.imul(band * 31 + i * 17 + 7, 2654435761) >>> 0;
+      const w = 7 + h % 9;                                // 7 to 15 pixels wide
+      const c = colors[(i + band + ((h >>> 9) % 5 === 0 ? 1 : 0)) % 2];   // mostly alternating, sometimes not
+      const x0 = Math.max(a, x), x1 = Math.min(b, x + w);
+      if (x1 > x0) rect(x0, top, x1 - x0, ROW, c);
+      x += w;
+    }
   }
 
   function drawPanel() {
