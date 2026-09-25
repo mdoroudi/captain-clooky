@@ -389,8 +389,8 @@
       enemies: { raccoon: 0, alien: 4.5 } },  // red aliens take the raccoons' place
     { key: 'autumn', name: 'Autumn Rapids',       // light blue river with a strong current, red autumn trees
       water: '#1C3F86', streak: '#5A86C8', current: '#F2F8FF', rapids: true,   // dark blue river, white rapids
-      land: '#7A4A22', landDot: '#5E3616', shore: '#4A2A10', shoreW: 2,
-      leafLitter: ['#E8781E', '#F29A32', '#C85A16', '#F4B03A'], litterPerRow: 5,   // brown ground thick with orange grass and leaves
+      land: '#8A4A1E', landDot: '#6A3414', shore: '#4A2A10', shoreW: 2,
+      leafLitter: ['#D2601E', '#E8781E', '#B8481A', '#F09A34', '#9A3A14', '#F4B03A'], litterDensity: 2.5,   // a thick carpet of big autumn leaves
       leaves: '#D8261E',                                 // the eagles' pine trees turn red too
       decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, clusters: true,   // big trees in clusters, with grass between
       scatter: ['boulder', 'boulder', 'boulder', 'autumnshrub', 'autumnshrub'], scatterFill: 0.9, scatterGap: 10,   // lots of gray boulders, some shrubs
@@ -2080,16 +2080,18 @@
       rect(rr, top, W - rr, ROW, T.land);
       const k = r + 1000;                          // keep the texture pattern positive below the start line
       if ((k * 13) % 5 === 0) { rect((k * 29) % Math.max(1, l - 2), top + 1, 2, 1, T.landDot); rect(rr + 2 + (k * 31) % Math.max(1, W - rr - 4), top + 2, 2, 1, T.landDot); }
-      if (T.leafLitter && (T.litterPerRow || (k * 7) % 3 === 0)) {                   // fallen leaves on the grass
+      if (T.leafLitter && T.litterDensity) {                   // a carpet of big fallen leaves covering the ground
+        const leaf = (x, y, c) => { rect(x, y, 3, 2, c); rect(x + 1, y - 1, 1, 1, c); };
+        for (const [a, b] of [[0, l - T.shoreW - 3], [rr + T.shoreW, W - 3]]) {
+          for (let e = 0, n = Math.floor((b - a) / T.litterDensity); e < n; e++) {
+            const h = Math.imul(k * 73 + e * 131, 2654435761) >>> 0;
+            leaf(a + h % Math.max(1, b - a), top + (h >>> 8) % 3, T.leafLitter[(h >>> 12) % T.leafLitter.length]);
+          }
+        }
+      } else if (T.leafLitter && (k * 7) % 3 === 0) {            // a few fallen leaves on the grass
         const c = T.leafLitter[k % T.leafLitter.length];
         if (l > 6) rect((k * 37) % (l - 4), top + 1, 2, 1, c);
         if (W - rr > 6) rect(rr + 2 + (k * 23) % (W - rr - 5), top + 2, 2, 1, c);
-        if (l > 12 && k % 2) rect((k * 53) % (l - 4), top, 1, 2, T.leafLitter[(k + 1) % T.leafLitter.length]);
-        for (let e = 2; e < (T.litterPerRow || 0); e++) {         // extra tufts for a thick carpet of orange
-          const ce = T.leafLitter[(k + e) % T.leafLitter.length];
-          if (l > 8) rect((k * (19 + e * 7)) % (l - 4), top + (e % 3), 2, 1, ce);
-          if (W - rr > 8) rect(rr + 2 + (k * (17 + e * 5)) % (W - rr - 5), top + ((e + 1) % 3), 2, 1, ce);
-        }
       }
       rect(l - T.shoreW, top, T.shoreW, ROW, T.shore);
       rect(rr, top, T.shoreW, ROW, T.shore);
@@ -2099,6 +2101,13 @@
         rect(il, top, Math.min(T.shoreW, ir - il), ROW, T.shore);
         rect(Math.max(il, ir - T.shoreW), top, Math.min(T.shoreW, ir - il), ROW, T.shore);
         if ((k * 7) % 4 === 0 && ir - il > 10) rect(il + 3 + (k * 11) % (ir - il - 6), top + 1, 2, 1, T.landDot);
+        if (T.leafLitter && T.litterDensity && ir - il > 10) {
+          for (let e = 0, n = Math.floor((ir - il - 8) / T.litterDensity); e < n; e++) {
+            const h = Math.imul(k * 59 + e * 97, 2654435761) >>> 0;
+            const lx = il + 4 + h % Math.max(1, ir - il - 10), c = T.leafLitter[(h >>> 12) % T.leafLitter.length];
+            rect(lx, top + (h >>> 8) % 3, 3, 2, c); rect(lx + 1, top + (h >>> 8) % 3 - 1, 1, 1, c);
+          }
+        }
       }
     }
   }
