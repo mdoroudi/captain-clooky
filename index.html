@@ -337,6 +337,7 @@
     tripleLaser: { every: 1000, secondsPer1000: 10, angle: 40 },   // power-up: 3 beams; lasts 10 s at 1,000 points, 20 s at 2,000, 30 s at 3,000...
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
+    bumpSeconds: 0.5,         // bonking a riverbank: the river pauses this long (no life lost)
     points: {
       fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, alien: 150, wolfsnake: 500, crate: 20, medic: -100, wall: 50,
       levelBonus: 500, feedBonusMax: 250
@@ -527,6 +528,7 @@
   }
   const sfx = {
     pew()      { tone(1250, 0.08, 'square', 0.035, -800); if (Math.random() < 0.12) buk(520, 330, 0.07, 0.05, 0.08); },
+    bonk()     { tone(170, 0.14, 'square', 0.07, -70); noise(0.12, 0.05, 900, 300); },
     bawk()     { buk(520, 330, 0.07, 0); buk(420, 820, 0.09, 0.12, 0.16); buk(820, 360, 0.3, 0.21, 0.16); noise(0.3, 0.08, 1200, 200); },
     zap()      { noise(0.18, 0.08, 2400, 400); tone(520, 0.12, 'square', 0.04, -300); },
     pfft()     { noise(0.55, 0.12, 900, 120, 0, 'lowpass'); tone(300, 0.5, 'sawtooth', 0.04, -220); },
@@ -889,6 +891,7 @@
   let dist = 0, px = W / 2, feed = 1, checkpointY = 0;
   let objects = [], lasers = [], particles = [];
   let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
+  let bumpT = 0;   // time left in a riverbank bump (the river pauses, no steering)
   let tripleT = 0, tripleMax = 1, nextTripleAt = CONFIG.tripleLaser.every;
   let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
   let refilling = false, deathCause = '';
@@ -984,7 +987,7 @@
     dist = y;
     px = lv.safeX(dist);
     feed = 1;
-    lasers = []; jamT = 0; fireCooldown = 0;
+    lasers = []; jamT = 0; fireCooldown = 0; bumpT = 0;
     spawnObjectsFrom(dist);
   }
 
@@ -1019,6 +1022,21 @@
     if (navigator.vibrate) { try { navigator.vibrate(150); } catch (e) {} }
     showBanner(cause === 'feed' ? 'Out of feed!' : cause === 'bank' ? 'Bonk! Watch the riverbank!' : cause === 'wall' ? 'Shoot the sandbags!' : 'Bawk!', 1.5);
     updateHud();
+  }
+
+  // Bonked a riverbank or island: bounce back into open water and pause briefly (no life lost)
+  function bumpBank() {
+    const [cl, cr] = lv.channel(dist, px);
+    const fromX = px;
+    px = clamp(px, cl + 12, cr - 12);
+    let ok = true;
+    for (let yy = dist - 5; yy <= dist + 5 && ok; yy += ROW) ok = lv.isWater(yy, px, 5);
+    if (!ok) px = lv.safeX(dist);                      // wedged at an island tip: hop to the widest water
+    bumpT = CONFIG.bumpSeconds;
+    invulnT = Math.max(invulnT, CONFIG.bumpSeconds + 0.4);   // a quick flash, and nothing can hit you mid-bump
+    puff((fromX + px) / 2, dist, 5, false, [lv.theme.shore, lv.theme.land]);
+    sfx.bonk();
+    showBanner('Bonk!', 0.7);
   }
 
   function respawn() {
@@ -1271,9 +1289,14 @@
 
     // Speed: Up = faster, Down = slower, nothing = normal
     const S = CONFIG.speed;
-    speedNow = held('up') && !held('down') ? S.fast : held('down') && !held('up') ? S.slow : S.normal;
-    dist += speedNow * dt;
-    steer(dt);
+    if (bumpT > 0) {
+      bumpT -= dt;          // bumped a bank: the river pauses for a moment and Clooky can't steer
+      speedNow = 0;
+    } else {
+      speedNow = held('up') && !held('down') ? S.fast : held('down') && !held('up') ? S.slow : S.normal;
+      dist += speedNow * dt;
+      steer(dt);
+    }
     if (invulnT > 0) invulnT -= dt;
 
     // Feed drains over time
@@ -1416,7 +1439,10 @@
     for (const o of objects) {
       if (!o.alive) continue;
       if (o.type === 'wall') {
-        if (Math.abs(dist - o.y) < 8) { die('wall'); return; }
+        if (dist > o.y - 8) {   // can't fly through: wait in front of it until it's blasted
+          dist = o.y - 8;
+          if (!o.warned) { o.warned = true; showBanner('Shoot the sandbags!', 1.4); sfx.bonk(); }
+        }
         continue;
       }
       if (o.type === 'crate' && !o.landed) continue;
@@ -1435,7 +1461,7 @@
 
     // Riverbanks and islands
     for (let yy = dist - 5; yy <= dist + 5; yy += ROW) {
-      if (!lv.isWater(yy, px, 5)) { die('bank'); return; }
+      if (!lv.isWater(yy, px, 5)) { bumpBank(); break; }
     }
 
     objects = objects.filter(o => o.alive && o.phase !== 'gone' && sy(o.y) < PLAY_H + 40);
