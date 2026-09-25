@@ -388,11 +388,12 @@
       decor: ['rocket', 'rocket', 'ufo', 'ufo', 'crater', 'crater'], island: ['crater', 'ufo'],
       enemies: { raccoon: 0, alien: 4.5 } },  // red aliens take the raccoons' place
     { key: 'autumn', name: 'Autumn Rapids',       // light blue river with a strong current, red autumn trees
-      water: '#6DBBE6', streak: '#B4DDF4', current: '#174A94', land: '#4E9A3A', landDot: '#3E8A30', shore: '#8A6A3A', shoreW: 2,
-      leafLitter: ['#F08A24', '#E0602A', '#F4B03A'],   // fallen orange leaves on the grass
+      water: '#1C3F86', streak: '#5A86C8', current: '#F2F8FF', rapids: true,   // dark blue river, white rapids
+      land: '#7A4A22', landDot: '#5E3616', shore: '#4A2A10', shoreW: 2,
+      leafLitter: ['#E8781E', '#F29A32', '#C85A16', '#F4B03A'], litterPerRow: 5,   // brown ground thick with orange grass and leaves
       leaves: '#D8261E',                                 // the eagles' pine trees turn red too
       decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, clusters: true,   // big trees in clusters, with grass between
-      scatter: ['boulder', 'autumnshrub', 'autumnshrub'],   // gray boulders and orange/yellow shrubs in the open grass
+      scatter: ['boulder', 'boulder', 'boulder', 'autumnshrub', 'autumnshrub'], scatterFill: 0.9, scatterGap: 10,   // lots of gray boulders, some shrubs
       island: ['autumntree'],
       enemies: { anaconda: 0, wolfsnake: 2.2 } }         // the wolf-snake is this river's water monster
   ];
@@ -816,9 +817,10 @@
     // Some themes also scatter smaller things (boulders, shrubs) in the open ground between the clusters
     if (theme.scatter) {
       const bigOnes = decor.filter(d => d.type === theme.decor[0]);
-      for (let y = 20; y < baseY + 300; y += 14 + rng() * 16) {
+      const gap = theme.scatterGap || 14;
+      for (let y = 20; y < baseY + 300; y += gap + rng() * 16) {
         for (const side of [-1, 1]) {
-          if (rng() > 0.7) continue;
+          if (rng() > (theme.scatterFill || 0.7)) continue;
           const type = theme.scatter[Math.floor(rng() * theme.scatter.length)];
           const sc = scaleOf(type);
           const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
@@ -2055,10 +2057,15 @@
       if (((r + 1000) * 37) % 9 === 0) rect(l + (((r + 1000) * 53) % Math.max(1, rr - l - 8)) + 2, top + 1, 6, 1, T.streak);
       if (T.current) {                                           // strong current: dark blue streaks racing downstream
         const flow = Math.floor(clock * 12);
-        if (((r + flow + 1000) * 29) % 7 === 0) {
+        if (((r + flow + 1000) * 29) % (T.rapids ? 4 : 7) === 0) {
           const span = Math.max(1, rr - l - 22);
           rect(l + 4 + (((r + 1000) * 41) % span), top, 16, 1, T.current);
           rect(l + 4 + (((r + 1000) * 67) % span), top + 2, 10, 1, T.current);
+          if (T.rapids) {                                          // white water: foam splashes along the streaks
+            const fx = l + 4 + (((r + 1000) * 83) % span);
+            rect(fx, top + 1, 3, 1, T.current); rect(fx + 1, top, 1, 3, T.current);
+            if (((r + 1000) * 13) % 3 === 0) rect(l + 6 + (((r + 1000) * 97) % span), top + 3, 6, 1, T.streak);
+          }
         }
       }
       if (T.smoke && ((r + 1000) * 43) % 13 === 0) {            // drifting smoke over the orange river
@@ -2073,11 +2080,16 @@
       rect(rr, top, W - rr, ROW, T.land);
       const k = r + 1000;                          // keep the texture pattern positive below the start line
       if ((k * 13) % 5 === 0) { rect((k * 29) % Math.max(1, l - 2), top + 1, 2, 1, T.landDot); rect(rr + 2 + (k * 31) % Math.max(1, W - rr - 4), top + 2, 2, 1, T.landDot); }
-      if (T.leafLitter && (k * 7) % 3 === 0) {                   // fallen leaves on the grass
+      if (T.leafLitter && (T.litterPerRow || (k * 7) % 3 === 0)) {                   // fallen leaves on the grass
         const c = T.leafLitter[k % T.leafLitter.length];
         if (l > 6) rect((k * 37) % (l - 4), top + 1, 2, 1, c);
         if (W - rr > 6) rect(rr + 2 + (k * 23) % (W - rr - 5), top + 2, 2, 1, c);
         if (l > 12 && k % 2) rect((k * 53) % (l - 4), top, 1, 2, T.leafLitter[(k + 1) % T.leafLitter.length]);
+        for (let e = 2; e < (T.litterPerRow || 0); e++) {         // extra tufts for a thick carpet of orange
+          const ce = T.leafLitter[(k + e) % T.leafLitter.length];
+          if (l > 8) rect((k * (19 + e * 7)) % (l - 4), top + (e % 3), 2, 1, ce);
+          if (W - rr > 8) rect(rr + 2 + (k * (17 + e * 5)) % (W - rr - 5), top + ((e + 1) % 3), 2, 1, ce);
+        }
       }
       rect(l - T.shoreW, top, T.shoreW, ROW, T.shore);
       rect(rr, top, T.shoreW, ROW, T.shore);
