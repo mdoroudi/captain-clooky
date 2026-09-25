@@ -138,11 +138,21 @@
     border-radius: 6px;
   }
   .overlay[hidden] { display: none; }
+  .overlay { container-type: inline-size; }   /* lets the heading size itself to the game box */
+  /* Title screen text: a short intro, with "… more" for the rest. The text area shrinks and scrolls
+     on small screens, so the title and the Play button always stay inside the box. */
+  .intro { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 0.8em; }
+  .intro .more { display: flex; flex-direction: column; align-items: center; gap: 0.8em; }
+  .intro .more[hidden] { display: none; }
+  #titleScreen { padding-bottom: calc(1em + 9%); }   /* keep the title card above the lives/feed strip */
+  .more-btn { font: inherit; background: none; border: 0; padding: 0; color: var(--gold); text-decoration: underline; cursor: pointer; }
+  .more-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   h1 {
     margin: 0;
     font-weight: 700;
     font-size: clamp(24px, 7.5vmin, 68px);
     line-height: 1;
+    font-size: min(clamp(24px, 7.5vmin, 68px), 6.2cqw);   /* never wider than the game box */
     color: var(--gold);
     text-shadow: 0.08em 0.08em 0 var(--plum);
   }
@@ -259,8 +269,13 @@
     <div class="overlay" id="titleScreen">
       <h1>Captain Clooky</h1>
       <canvas class="title-sprite" id="titleSprite" width="32" height="32" aria-hidden="true"></canvas>
-      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks, raccoons, anacondas, red aliens (two zaps!), the wolf-snake and the big eagle with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
-      <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
+      <div class="intro">
+        <p>Fly Captain Clooky up the river and zap the bad guys with your purple laser! <button class="more-btn" id="moreBtn" type="button" aria-expanded="false" aria-controls="moreText">… more</button></p>
+        <div class="more" id="moreText" hidden>
+          <p>Watch out for fox rafts, hawks, raccoons, anacondas, red aliens (two zaps!), the wolf-snake and the big eagle. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
+          <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
+        </div>
+      </div>
       <p id="titleBest">Best 0 · Private</p>
       <button class="play" id="playBtn" type="button">Play</button>
     </div>
@@ -2281,6 +2296,13 @@
   //  Buttons and test mode
   // =====================================================================
   $('playBtn').addEventListener('click', newGame);
+  $('moreBtn').addEventListener('click', () => {
+    const more = $('moreText'), open = more.hidden;
+    more.hidden = !open;
+    $('moreBtn').textContent = open ? 'less' : '… more';
+    $('moreBtn').setAttribute('aria-expanded', String(open));
+    $('moreBtn').blur();
+  });
   $('continueBtn').addEventListener('click', continueGame);
   $('nextBtn').addEventListener('click', nextLevel);
   $('resumeBtn').addEventListener('click', togglePause);
