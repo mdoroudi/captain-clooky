@@ -1032,12 +1032,25 @@
 
   // Bonked a riverbank or island: bounce back into open water and pause briefly (no life lost)
   function bumpBank() {
-    const [cl, cr] = lv.channel(dist, px);
+    // Move to the nearest spot that's clear of land everywhere Clooky touches, including just
+    // ahead (a head-on hit on an island's front end is only land ahead, not beside her).
+    const clearAt = (x, ahead) => {
+      for (let yy = dist - 5; yy <= dist + ahead; yy += ROW) if (!lv.isWater(yy, x, 5)) return false;
+      return true;
+    };
+    const nearestClear = ahead => {
+      for (let d = 1; d < W; d++) for (const x of [px - d, px + d]) if (x >= 8 && x <= W - 8 && clearAt(x, ahead)) return x;
+      return null;
+    };
     const fromX = px;
-    px = clamp(px, cl + 12, cr - 12);
-    let ok = true;
-    for (let yy = dist - 5; yy <= dist + 5 && ok; yy += ROW) ok = lv.isWater(yy, px, 5);
-    if (!ok) px = lv.safeX(dist);                      // wedged at an island tip: hop to the widest water
+    // Prefer a spot that stays clear for about the next second of flying, so she isn't bonked
+    // again straight away by an island that keeps widening; otherwise just clear the land here.
+    let to = nearestClear(60);
+    if (to == null) to = nearestClear(5);
+    if (to != null) {
+      const nudge = to + Math.sign(to - fromX) * 4;   // a little extra room so she doesn't graze it again
+      px = clearAt(nudge, 5) ? nudge : to;
+    }
     bumpT = CONFIG.bumpSeconds;
     invulnT = Math.max(invulnT, CONFIG.bumpSeconds + 0.4);   // a quick flash, and nothing can hit you mid-bump
     puff((fromX + px) / 2, dist, 5, false, [lv.theme.shore, lv.theme.land]);
