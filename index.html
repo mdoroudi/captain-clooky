@@ -388,10 +388,11 @@
       decor: ['rocket', 'rocket', 'ufo', 'ufo', 'crater', 'crater'], island: ['crater', 'ufo'],
       enemies: { raccoon: 0, alien: 4.5 } },  // red aliens take the raccoons' place
     { key: 'autumn', name: 'Autumn Rapids',       // light blue river with a strong current, red autumn trees
-      water: '#86CDF2', streak: '#C8EAFB', current: '#1E5AA8', land: '#4E9A3A', landDot: '#3E8A30', shore: '#8A6A3A', shoreW: 2,
+      water: '#6DBBE6', streak: '#B4DDF4', current: '#174A94', land: '#4E9A3A', landDot: '#3E8A30', shore: '#8A6A3A', shoreW: 2,
       leafLitter: ['#F08A24', '#E0602A', '#F4B03A'],   // fallen orange leaves on the grass
       leaves: '#D8261E',                                 // the eagles' pine trees turn red too
-      decor: ['autumntree'], decorScales: { autumntree: 2 }, clusters: true,   // big trees in clusters, with grass between
+      decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, clusters: true,   // big trees in clusters, with grass between
+      scatter: ['boulder', 'autumnshrub', 'autumnshrub'],   // gray boulders and orange/yellow shrubs in the open grass
       island: ['autumntree'],
       enemies: { anaconda: 0, wolfsnake: 2.2 } }         // the wolf-snake is this river's water monster
   ];
@@ -810,6 +811,28 @@
         if (y > baseY - 40 && y < baseY + 175) continue;   // room for the fort, hangar and chicken coops
         if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
         decor.push({ type, side, y, x: Math.round(x), scale: sc });
+      }
+    }
+    // Some themes also scatter smaller things (boulders, shrubs) in the open ground between the clusters
+    if (theme.scatter) {
+      const bigOnes = decor.filter(d => d.type === theme.decor[0]);
+      for (let y = 20; y < baseY + 300; y += 14 + rng() * 16) {
+        for (const side of [-1, 1]) {
+          if (rng() > 0.7) continue;
+          const type = theme.scatter[Math.floor(rng() * theme.scatter.length)];
+          const sc = scaleOf(type);
+          const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
+          let edge = side < 0 ? W : 0;
+          for (let yy = y - 2; yy <= y + dh; yy += ROW) edge = side < 0 ? Math.min(edge, bankL(yy)) : Math.max(edge, bankR(yy));
+          const room = side < 0 ? edge - 6 - dw : W - edge - 6 - dw;
+          if (room < 2) continue;
+          const x = Math.round(side < 0 ? 2 + rng() * room : edge + 4 + rng() * room);
+          if (y > baseY - 40 && y < baseY + 175) continue;   // room for the fort, hangar and chicken coops
+          if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
+          const [tw, th] = DECOR_SIZE[theme.decor[0]].map(v => v * scaleOf(theme.decor[0]));
+          if (bigOnes.some(d => y + dh > d.y - 4 && y < d.y + th && x + dw > d.x - 4 && x < d.x + tw + 4)) continue;   // not under a big tree
+          decor.push({ type, side, y, x, scale: sc });
+        }
       }
     }
     // A little scenery on the islands too (the space level puts Neptune on the first asteroid)
@@ -1844,7 +1867,7 @@
     slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7],
     mercury: [7, 7], venus: [9, 9], earth: [9, 9], mars: [7, 7], jupiter: [15, 15], saturn: [17, 11], uranus: [9, 9], neptune: [9, 9],
     stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16], alien: [11, 14],
-    rocket: [7, 17], ufo: [15, 8], crater: [11, 5], autumntree: [17, 20]
+    rocket: [7, 17], ufo: [15, 8], crater: [11, 5], autumntree: [17, 20], boulder: [11, 7], autumnshrub: [10, 8]
   };
   function drawDecor(d) {
     const sc = d.scale || 1;
@@ -1996,6 +2019,16 @@
         rect(x + 5, y - 11, 6, 2, '#A81810');                                            // shade under the crown
         mushroom(x + 3, y - 6); mushroom(x + 9, y - 3);                                  // growing off the trunk
         break;
+      }
+      case 'boulder':      // gray boulder
+        rect(x + 2, y - 7, 7, 1, '#8E8E96'); rect(x + 1, y - 6, 9, 5, '#7A7A84'); rect(x, y - 4, 11, 4, '#7A7A84');
+        rect(x + 2, y - 6, 3, 2, '#A8A8B2'); rect(x + 7, y - 3, 3, 3, '#62626C'); rect(x + 1, y - 1, 9, 1, '#4E4E58'); break;
+      case 'autumnshrub': {  // round shrub, some orange with yellow, some yellow with orange
+        const orange = Math.round(d.y) % 2 === 0;
+        const main = orange ? '#E8741E' : '#F2B81E', spots = orange ? '#FFC43A' : '#F08A24';
+        rect(x + 2, y - 8, 6, 1, main); rect(x + 1, y - 7, 8, 7, main); rect(x, y - 5, 10, 4, main);
+        rect(x + 2, y - 6, 2, 2, spots); rect(x + 6, y - 5, 2, 2, spots); rect(x + 4, y - 3, 2, 1, spots);
+        rect(x + 1, y - 1, 8, 1, orange ? '#B8541A' : '#C08A14'); break;
       }
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
