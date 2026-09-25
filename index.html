@@ -1439,10 +1439,7 @@
     for (const o of objects) {
       if (!o.alive) continue;
       if (o.type === 'wall') {
-        if (dist > o.y - 8) {   // can't fly through: wait in front of it until it's blasted
-          dist = o.y - 8;
-          if (!o.warned) { o.warned = true; showBanner('Shoot the sandbags!', 1.4); sfx.bonk(); }
-        }
+        if (Math.abs(dist - o.y) < 8) { die('wall'); return; }
         continue;
       }
       if (o.type === 'crate' && !o.landed) continue;
