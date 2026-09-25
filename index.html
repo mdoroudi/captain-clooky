@@ -1021,7 +1021,7 @@
     puff(px, dist, 14, true);
     sfx.bawk();
     if (navigator.vibrate) { try { navigator.vibrate(150); } catch (e) {} }
-    showBanner(cause === 'feed' ? 'Out of feed!' : cause === 'bank' ? 'Bonk! Watch the riverbank!' : cause === 'wall' ? 'Shoot the sandbags!' : 'Bawk!', 1.5);
+    showBanner(cause === 'feed' ? 'Flap power depleted!' : cause === 'bank' ? 'Bonk! Watch the riverbank!' : cause === 'wall' ? 'Shoot the sandbags!' : 'Bawk!', 1.5);
     updateHud();
   }
 
