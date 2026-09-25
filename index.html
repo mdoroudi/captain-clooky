@@ -252,7 +252,7 @@
     <div class="overlay" id="titleScreen">
       <h1>Captain Clooky</h1>
       <canvas class="title-sprite" id="titleSprite" width="32" height="32" aria-hidden="true"></canvas>
-      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks, raccoons, anacondas and the big eagle with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
+      <p>Fly Captain Clooky up the river! Zap the fox rafts, hawks, raccoons, anacondas, red aliens (two zaps!) and the big eagle with your purple laser. Fly over GRUBS crates to fill your feed. Blast the sandbag walls, and never shoot the medic chicks!</p>
       <p>Arrows or A/D to steer, Up/Down for speed, Space to fire. Press SPACE or tap Play to start.</p>
       <p id="titleBest">Best 0 · Private</p>
       <button class="play" id="playBtn" type="button">Play</button>
@@ -316,7 +316,7 @@
     lives: { start: 3, max: 5, extraEvery: 2000 },
     invulnerableSeconds: 2,
     points: {
-      fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, crate: 20, medic: -100, wall: 50,
+      fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, alien: 150, crate: 20, medic: -100, wall: 50,
       levelBonus: 500, feedBonusMax: 250
     },
     level: {
@@ -380,7 +380,12 @@
     { key: 'space', name: 'TB in Space',
       water: '#3A0808', streak: '#5E1A18', land: '#2F5FCF', landDot: '#FFFFFF', shore: '#9FC3FF', shoreW: 2,
       decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars', 'alien', 'alien', 'alien'], island: ['asteroid', 'asteroid'],
-      islandFirst: 'neptuneRock' }
+      islandFirst: 'neptuneRock' },
+    { key: 'alienplanet', name: 'Alien Planet',   // smoky orange river on a dark brown planet, giant Jupiter on the right
+      water: '#C4622A', streak: '#E8955A', land: '#3A2416', landDot: '#24160C', shore: '#6E4428', shoreW: 3, smoke: true, jupiter: true,
+      decorScales: { rocket: 2, ufo: 2 },   // big rocket ships and saucers
+      decor: ['rocket', 'rocket', 'ufo', 'ufo', 'crater', 'crater'], island: ['crater', 'ufo'],
+      enemies: { raccoon: 0, alien: 4.5 } }   // red aliens take the raccoons' place
   ];
   const themeFor = level => THEMES[(level - 1) % THEMES.length];
 
@@ -502,6 +507,7 @@
     hiss()     { noise(0.45, 0.07, 5000, 3000, 0, 'highpass'); },
     screech()  { tone(1800, 0.35, 'sawtooth', 0.04, -900); tone(2200, 0.25, 'square', 0.02, -1200, 0.05); },
     chitter()  { [1400, 1700, 1300].forEach((f, i) => tone(f, 0.04, 'square', 0.03, 0, i * 0.05)); },
+    warble()   { [620, 940, 620, 940, 1250].forEach((f, i) => tone(f, 0.05, 'triangle', 0.035, 0, i * 0.045)); },
     splash()   { noise(0.3, 0.08, 2600, 500); },
     powerUp()  { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.09, 'square', 0.05, 0, 0.35 + i * 0.07)); },
     start()    { tone(523, 0.08, 'square', 0.05); tone(659, 0.08, 'square', 0.05, 0, 0.09); tone(784, 0.12, 'square', 0.05, 0, 0.18); }
@@ -573,7 +579,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   const HIT = {                    // hit boxes (width, height), centred on the object
-    fox: [20, 10], hawk: [18, 10], raccoon: [14, 12], anaconda: [12, 12], eagle: [22, 12], crate: [24, 16], medic: [14, 10]
+    fox: [20, 10], hawk: [18, 10], raccoon: [14, 12], alien: [14, 12], anaconda: [12, 12], eagle: [22, 12], crate: [24, 16], medic: [14, 10]
   };
   const REFILL_ZONE = [24, 30];    // flying through this area around a crate refills feed
 
@@ -703,16 +709,17 @@
         }
         used.push(y);
       }
-      // Enemies, spread through the section
-      const types = Object.keys(D.weights);
-      const total = types.reduce((sum, k) => sum + D.weights[k], 0);
+      // Enemies, spread through the section (some worlds swap in their own enemies)
+      const weights = { ...D.weights, ...(themeFor(level).enemies || {}) };
+      const types = Object.keys(weights).filter(k => weights[k] > 0);
+      const total = types.reduce((sum, k) => sum + weights[k], 0);
       for (let i = 0; i < D.enemiesPerSection; i++) {
         let y = s0 + 90 + (i + 0.2 + rng() * 0.6) * ((sectionLength - 150) / D.enemiesPerSection);
         let tries = 0;
         while (!free(y) && tries++ < 6) y += 28;
         if (!free(y)) continue;
         let pick = rng() * total, type = types[0];
-        for (const k of types) { if (pick < D.weights[k]) { type = k; break; } pick -= D.weights[k]; }
+        for (const k of types) { if (pick < weights[k]) { type = k; break; } pick -= weights[k]; }
         if (type === 'eagle') {
           // Perch on a tall redwood; pick the bank with room for the tree, or fall back to a hawk
           const room = side => { let m = W; for (let yy = y - 4; yy <= y + 40; yy += ROW) m = Math.min(m, side < 0 ? bankL(yy) : W - bankR(yy)); return m; };
@@ -728,7 +735,7 @@
         }
         if (type === 'hawk') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
         else if (type === 'anaconda') plan.push({ type, x: waterX(y, 16), y });
-        else if (type === 'raccoon') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
+        else if (type === 'raccoon' || type === 'alien') plan.push({ type, x: 0, y, side: rng() < 0.5 ? -1 : 1 });
         else plan.push({ type, x: waterX(y, 14), y, dir: rng() < 0.5 ? -1 : 1 });
         used.push(y);
       }
@@ -772,12 +779,13 @@
     // Scenery on the banks (checked so it never pokes into the water)
     const theme = themeFor(level);
     const decor = trees.slice();   // eagle redwoods first, then random scenery
+    const scaleOf = type => (theme.decorScales && theme.decorScales[type]) || theme.decorScale || 1;
     const density = theme.density || 1;
     for (let y = 10; y < baseY + 300; y += (14 + rng() * 22) / density) {
       for (const side of [-1, 1, ...(theme.perRow > 1 ? [-1, 1] : [])]) {
         if (rng() > (theme.fill || 0.65)) continue;
         const type = theme.decor[Math.floor(rng() * theme.decor.length)];
-        const sc = theme.decorScale || 1;
+        const sc = scaleOf(type);
         const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
         if (type === 'vine' || type === 'floe') {   // these hug the shoreline
           decor.push({ type, side, y, x: 0 });
@@ -790,7 +798,7 @@
         const x = side < 0 ? 2 + rng() * room : edge + 4 + rng() * room;
         if (y > baseY - 40 && y < baseY + 175) continue;   // room for the fort, hangar and chicken coops
         if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) continue;   // leave the redwoods room
-        decor.push({ type, side, y, x: Math.round(x), scale: theme.decorScale || 1 });
+        decor.push({ type, side, y, x: Math.round(x), scale: sc });
       }
     }
     // A little scenery on the islands too (the space level puts Neptune on the first asteroid)
@@ -798,12 +806,12 @@
     for (const [a, b] of islands) {
       for (let r = a + 6; r < b - 4; r += theme.decorScale ? 3 + Math.floor(rng() * 3) : 7 + Math.floor(rng() * 5)) {
         const type = firstIslandDecor || theme.island[Math.floor(rng() * theme.island.length)];
-        const sc = theme.decorScale || 1;
+        const sc = scaleOf(type);
         const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
         let l = -1, rr = W + 1;
         for (let k = r; k <= r + Math.ceil(dh / ROW); k++) { if (!hasIsland(k)) { l = W; break; } l = Math.max(l, IL[k]); rr = Math.min(rr, IR[k]); }
         if (rr - l < dw + 6) continue;
-        decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2), scale: theme.decorScale || 1 });
+        decor.push({ type, side: 0, y: r * ROW, x: Math.round((l + rr) / 2 - dw / 2), scale: sc });
         firstIslandDecor = null;
       }
     }
@@ -893,8 +901,9 @@
       if (o.type === 'hawk') { o.active = false; o.x = o.side < 0 ? 8 : W - 8; }
       if (o.type === 'anaconda') { o.phase = 'lurk'; o.k = 0; o.baseX = o.x; o.headX = o.x; }
       if (o.type === 'eagle') { o.phase = 'perch'; o.cx = o.x; }
-      if (o.type === 'raccoon') {
+      if (o.type === 'raccoon' || o.type === 'alien') {
         o.phase = 'wait'; o.hop = 0;
+        if (o.type === 'alien') o.hp = 2;   // takes two hits
         o.x = o.side < 0 ? Math.max(7, lv.bankL(o.y) - 9) : Math.min(W - 7, lv.bankR(o.y) + 9);
       }
       objects.push(o);
@@ -1146,12 +1155,20 @@
       showBanner('Oops! Not the medic! -100', 1.6);
       return;
     }
+    if (o.type === 'alien' && o.hp > 1) {   // first hit: the alien flashes and keeps coming
+      o.hp--;
+      o.hurt = 0.3;
+      sfx.pfft();
+      for (let i = 0; i < 4; i++) particles.push({ kind: 'bit', x: o.x + (Math.random() - 0.5) * 8, wy: o.y, vx: (Math.random() - 0.5) * 40, vy: 15 + Math.random() * 20, life: 0.4, color: '#FF5A4A' });
+      return;
+    }
     o.alive = false;
     addScore(P[o.type]);
     sfx.zap();
     const fur = o.type === 'fox' ? ['#E07A2E', '#FFFFFF', '#5B6B2E']
       : o.type === 'hawk' ? ['#8A5A2B', '#D8B07A', '#FFFFFF']
       : o.type === 'raccoon' ? ['#8C8C94', '#2E2E36', '#6B7A3A']
+      : o.type === 'alien' ? ['#E0302A', '#8A1410', '#8CFF6A']
       : o.type === 'anaconda' ? ['#3E8E4A', '#2E5A2A', '#E6D36A']
       : o.type === 'eagle' ? ['#5A3A1A', '#FFFFFF', '#F2C230'] : ['#A8733A', '#C9924F', '#FFFFFF'];
     puff(o.x, hitY(o), 8, false, fur);
@@ -1242,13 +1259,14 @@
         const l = cl + 12, r = cr - 12;
         if (o.x < l) { o.x = l; o.dir = 1; }
         if (o.x > r) { o.x = r; o.dir = -1; }
-      } else if (o.type === 'raccoon') {
+      } else if (o.type === 'raccoon' || o.type === 'alien') {
+        if (o.hurt > 0) o.hurt -= dt;
         const ahead = o.y - dist;
         if (o.phase === 'wait' && ahead < 95 && ahead > 20) {
           o.phase = 'jump'; o.jt = 0; o.fromX = o.x;
           const [cl, cr] = lv.channel(o.y, px);
           o.toX = clamp(px, cl + 10, cr - 10);
-          sfx.chitter();
+          if (o.type === 'alien') sfx.warble(); else sfx.chitter();
         }
         if (o.phase === 'jump') {
           o.jt = Math.min(1, o.jt + dt * 1.4 * Math.sqrt(D.enemySpeed));
@@ -1261,7 +1279,8 @@
           }
         } else if (o.phase === 'swim') {
           const dx = px - o.x;
-          o.x += Math.sign(dx) * Math.min(Math.abs(dx), 9 * D.enemySpeed * dt);
+          o.x += Math.sign(dx) * Math.min(Math.abs(dx), (o.type === 'alien' ? 14 : 9) * D.enemySpeed * dt);
+          if (o.type === 'alien') o.y -= 16 * D.enemySpeed * dt;   // aliens swim down the river, straight at you
           const [cl, cr] = lv.channel(o.y, o.x);
           o.x = clamp(o.x, cl + 8, cr - 8);
         }
@@ -1535,6 +1554,42 @@
     m(7, yy - 6, 3, 2, LIGHT); m(9, yy - 6, 1, 1, '#1A1A1A');
   }
 
+  // Red alien: waits on the bank, leaps into the river and swims at Clooky. Takes two hits;
+  // after the first it flashes white and its antennae droop.
+  function drawAlien(o, y) {
+    const x = Math.round(o.x);
+    const flash = o.hurt > 0 && Math.floor(clock * 30) % 2 === 0;
+    const RED = flash ? '#FFFFFF' : '#E0302A', DARK = flash ? '#FFD0D0' : '#8A1410', GLOW = '#8CFF6A';
+    const hurt = o.hp === 1;
+    const antennae = (yy) => {
+      if (hurt) { rect(x - 5, yy - 9, 3, 1, DARK); rect(x + 3, yy - 9, 3, 1, DARK); rect(x - 6, yy - 9, 1, 1, GLOW); rect(x + 6, yy - 9, 1, 1, GLOW); }
+      else { rect(x - 3, yy - 12, 1, 3, DARK); rect(x + 3, yy - 12, 1, 3, DARK); rect(x - 4, yy - 13, 2, 1, GLOW); rect(x + 3, yy - 13, 2, 1, GLOW); }
+    };
+    const head = (yy) => {
+      rect(x - 4, yy - 9, 9, 6, RED); rect(x - 5, yy - 8, 11, 4, RED);           // big round head
+      rect(x - 3, yy - 7, 3, 2, '#101010'); rect(x + 1, yy - 7, 3, 2, '#101010'); // big black eyes
+      rect(x - 3, yy - 7, 1, 1, GLOW); rect(x + 1, yy - 7, 1, 1, GLOW);           // green shine
+      rect(x - 1, yy - 4, 3, 1, DARK);                                            // mouth
+      antennae(yy);
+    };
+    if (o.phase === 'swim') {
+      const bob = Math.round(Math.sin(clock * 7 + o.y) * 0.8);
+      rect(x - 7, y + 2, 14, 1, lv.theme.streak);
+      rect(x - 9, y + 1 + bob, 3, 1, RED); rect(x + 7, y + 1 + bob, 3, 1, RED);   // arms paddling
+      head(y + 4 + bob);
+      return;
+    }
+    const hop = Math.round(o.hop || 0);
+    const crouch = o.phase === 'wait' ? Math.round(Math.abs(Math.sin(clock * 6 + o.y))) : 0;
+    const yy = y - hop + crouch;
+    if (hop > 2) { ctx.globalAlpha = 0.25; rect(x - 6, y + 4, 12, 2, '#1A0A04'); ctx.globalAlpha = 1; }   // shadow
+    rect(x - 3, yy - 3, 7, 5, RED); rect(x - 2, yy - 2, 5, 3, DARK);             // body
+    if (hop > 2) { rect(x - 6, yy - 4, 3, 1, RED); rect(x + 4, yy - 4, 3, 1, RED); }   // arms up while leaping
+    else { rect(x - 5, yy - 2, 2, 1, RED); rect(x + 4, yy - 2, 2, 1, RED); }
+    rect(x - 3, yy + 2, 2, 2, DARK); rect(x + 2, yy + 2, 2, 2, DARK);             // feet
+    head(yy);
+  }
+
   // Anaconda in a little helmet: a shadow under the water, then it rears up and lunges
   function drawAnaconda(o, y) {
     const GREEN = '#3E8E4A', DARK = '#2E5A2A', BELLY = '#C9C46A';
@@ -1725,7 +1780,8 @@
     pine: [9, 13], drift: [12, 5], floe: [10, 4], igloo: [12, 8], redwood: [14, 36],
     slimerock: [11, 7], deadtree: [12, 15], embershrub: [9, 7],
     mercury: [7, 7], venus: [9, 9], earth: [9, 9], mars: [7, 7], jupiter: [15, 15], saturn: [17, 11], uranus: [9, 9], neptune: [9, 9],
-    stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16], alien: [11, 14]
+    stars: [10, 6], asteroid: [11, 8], neptuneRock: [11, 16], alien: [11, 14],
+    rocket: [7, 17], ufo: [15, 8], crater: [11, 5]
   };
   function drawDecor(d) {
     const sc = d.scale || 1;
@@ -1845,6 +1901,27 @@
       case 'neptuneRock':   // Neptune sitting on top of an asteroid
         rect(x + 1, y - 7, 9, 7, '#7A7470'); rect(x, y - 5, 11, 4, '#7A7470'); rect(x + 3, y - 4, 2, 2, '#5C5652');
         planet(x + 5, y - 12, 4, '#3A5FE0'); rect(x + 2, y - 13, 7, 1, '#6E8CFF'); rect(x + 6, y - 10, 2, 1, '#22358A'); break;
+      // ---- Alien Planet: rocket ships, alien saucers and craters ----
+      case 'rocket': {    // a white rocket standing on its fins, flame flickering
+        rect(x + 2, y - 15, 3, 1, '#E0302A'); rect(x + 1, y - 14, 5, 2, '#E0302A');   // red nose
+        rect(x + 1, y - 12, 5, 9, '#EDEDF2'); rect(x + 5, y - 12, 1, 9, '#B8B8C4');   // body
+        rect(x + 2, y - 10, 3, 3, '#3A7FD8'); rect(x + 2, y - 10, 1, 1, '#A8D0FF');   // window
+        rect(x, y - 5, 1, 4, '#E0302A'); rect(x + 6, y - 5, 1, 4, '#E0302A');         // fins
+        rect(x + 2, y - 3, 3, 1, '#7A7A86');
+        if (Math.floor(clock * 8 + d.y) % 2) rect(x + 2, y - 2, 3, 2, '#FFC04A'); else rect(x + 3, y - 2, 1, 2, '#FF7A2A');
+        break;
+      }
+      case 'ufo': {       // alien flying saucer hovering over the ground
+        const hover = Math.round(Math.sin(clock * 3 + d.y) * 1);
+        ctx.globalAlpha = 0.3; rect(x + 3, y - 1, 9, 1, '#000000'); ctx.globalAlpha = 1;   // shadow
+        rect(x + 5, y - 8 + hover, 5, 2, '#9FE8C8'); rect(x + 6, y - 9 + hover, 3, 1, '#CFFFEA');   // glass dome
+        rect(x, y - 6 + hover, 15, 2, '#A8A8B8'); rect(x + 2, y - 4 + hover, 11, 1, '#6E6E80');    // saucer
+        for (let i = 0; i < 4; i++) rect(x + 2 + i * 3, y - 6 + hover, 1, 1, (Math.floor(clock * 5) + i) % 2 ? '#FFE066' : '#FF5A4A');   // blinking lights
+        break;
+      }
+      case 'crater':
+        rect(x + 1, y - 4, 9, 4, '#24160C'); rect(x, y - 3, 11, 2, '#24160C');
+        rect(x + 1, y - 5, 9, 1, '#6E4428'); rect(x + 2, y - 1, 7, 1, '#4E3020'); break;
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
         rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
@@ -1868,6 +1945,13 @@
         if (pop < 2) { rect(bx, top, 3, 1, T.streak); rect(bx - 1, top + 1, 1, 1, T.streak); rect(bx + 3, top + 1, 1, 1, T.streak); rect(bx, top + 2, 3, 1, T.streak); }
       }
       if (((r + 1000) * 37) % 9 === 0) rect(l + (((r + 1000) * 53) % Math.max(1, rr - l - 8)) + 2, top + 1, 6, 1, T.streak);
+      if (T.smoke && ((r + 1000) * 43) % 13 === 0) {            // drifting smoke over the orange river
+        const span = Math.max(1, rr - l - 14);
+        const sx = l + 4 + ((((r + 1000) * 29) + Math.floor(clock * 7)) % span);
+        ctx.globalAlpha = 0.4;
+        rect(sx, top, 11, 2, '#8E7F76'); rect(sx + 3, top - 2, 7, 2, '#B4A69C'); rect(sx + 6, top - 3, 3, 1, '#CFC3BA');
+        ctx.globalAlpha = 1;
+      }
       // Banks
       rect(0, top, l, ROW, T.land);
       rect(rr, top, W - rr, ROW, T.land);
@@ -1883,6 +1967,35 @@
         if ((k * 7) % 4 === 0 && ir - il > 10) rect(il + 3 + (k * 11) % (ir - il - 6), top + 1, 2, 1, T.landDot);
       }
     }
+  }
+
+  // Alien Planet: a giant Jupiter looming on the right. It's only drawn on the land to the right
+  // of the river, so the water you fly over always stays clear.
+  function drawGiantJupiter() {
+    ctx.save();
+    ctx.beginPath();
+    for (let y = 0; y < PLAY_H; y += ROW) {
+      const edge = lv.bankR(dist + PLAYER_Y - y) + lv.theme.shoreW;
+      ctx.rect(edge, y - 1, W - edge, ROW + 2);
+    }
+    ctx.clip();
+    const cx = W + 22, cy = 78, r = 70;
+    const BANDS = ['#EAD6B8', '#D9B38C', '#C99B6E', '#E3C39A', '#B5835A', '#D9B38C', '#EAD6B8', '#C99B6E', '#B5835A', '#E3C39A'];
+    for (let dy = -r; dy <= r; dy++) {
+      const half = Math.round(Math.sqrt(r * r - dy * dy));
+      rect(cx - half, cy + dy, half * 2, 1, BANDS[Math.floor((dy + r) / 14) % BANDS.length]);
+      if ((dy + r) % 14 === 0) rect(cx - half, cy + dy, half * 2, 1, '#A8744C');   // thin dark belts
+    }
+    // Great Red Spot
+    for (let dy = -5; dy <= 5; dy++) {
+      const half = Math.round(10 * Math.sqrt(1 - (dy * dy) / 30));
+      rect(cx - 44 - half, cy + 26 + dy, half * 2, 1, Math.abs(dy) > 3 ? '#D07A5A' : '#C0503A');
+    }
+    // Shadowed left edge
+    ctx.globalAlpha = 0.35;
+    for (let dy = -r; dy <= r; dy++) { const half = Math.round(Math.sqrt(r * r - dy * dy)); rect(cx - half, cy + dy, 6, 1, '#3A2416'); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   function drawPanel() {
@@ -1931,6 +2044,7 @@
       spawnObjectsFrom(0);
     }
     drawRiver();
+    if (lv.theme.jupiter) drawGiantJupiter();
     for (const d of lv.decor) drawDecor(d);
     drawBase();
     for (const o of objects) {
@@ -1965,6 +2079,7 @@
       const y = sy(o.y);
       if (y < -40 || y > PLAY_H + 40) continue;
       if (o.type === 'raccoon') drawRaccoon(o, y);
+      else if (o.type === 'alien') drawAlien(o, y);
       else if (o.type === 'hawk') drawHawk(o.x, y, -o.side);
       else if (o.type === 'eagle') drawEagle(o, y);
       else if (o.type === 'crate' && !o.landed) drawCrate(o.x, y, o.drop);
