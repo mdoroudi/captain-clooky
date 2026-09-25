@@ -897,6 +897,7 @@
   let fireCooldown = 0, jamT = 0, invulnT = 0, timer = 0, clock = 0;
   let bumpT = 0;   // time left in a riverbank bump (the river pauses, no steering)
   let flashT = 0;  // time left in the river's red flash after a sandbag wall blows up
+  let bank = 0;    // how much Clooky is tilting into a turn: -1 (left) to 1 (right)
   let tripleT = 0, tripleMax = 1, nextTripleAt = CONFIG.tripleLaser.every;
   let lowBeepT = 0, refillBeepT = 0, jamPuffT = 0, speedNow = CONFIG.speed.normal;
   let refilling = false, deathCause = '';
@@ -992,7 +993,7 @@
     dist = y;
     px = lv.safeX(dist);
     feed = 1;
-    lasers = []; jamT = 0; fireCooldown = 0; bumpT = 0; flashT = 0;
+    lasers = []; jamT = 0; fireCooldown = 0; bumpT = 0; flashT = 0; bank = 0;
     spawnObjectsFrom(dist);
   }
 
@@ -1299,6 +1300,7 @@
     if (bumpT > 0) {
       bumpT -= dt;          // bumped a bank: the river pauses for a moment and Clooky can't steer
       speedNow = 0;
+      bank += clamp(-bank, -8 * dt, 8 * dt);
     } else {
       speedNow = held('up') && !held('down') ? S.fast : held('down') && !held('up') ? S.slow : S.normal;
       dist += speedNow * dt;
@@ -1476,6 +1478,7 @@
   function steer(dt) {
     const dir = (held('right') ? 1 : 0) - (held('left') ? 1 : 0);
     px = clamp(px + dir * CONFIG.steerSpeed * dt, 8, W - 8);
+    bank += clamp(dir - bank, -8 * dt, 8 * dt);   // ease into (and out of) the tilt
   }
 
   // =====================================================================
@@ -1542,26 +1545,35 @@
     const wo = flap ? -1 : 1;
     const C = CHICKENS[chicken];
     const BODY = C.body, WING = C.wing, WING_D = C.wingDark, HELMET = '#5E7A3A', HELMET_D = '#44592A';
+    // Banking into a turn (like River Raid's jet): the wing on the inside of the turn tilts away
+    // and looks shorter and darker, the outer wing shortens a little, and the head leans in.
+    const b = opt.bank || 0;
+    const lw = 10 - Math.round(Math.max(0, -b) * 3 + Math.max(0, b) * 1);   // left wing length
+    const rw = 10 - Math.round(Math.max(0, b) * 3 + Math.max(0, -b) * 1);   // right wing length
+    const lean = Math.round(b);
     // Wings
-    rect(x - 10, y - 1 + wo, 20, 4, WING);
-    rect(x - 10, y + 2 + wo, 3, 2, WING_D); rect(x + 7, y + 2 + wo, 3, 2, WING_D);
-    rect(x - 10, y - 1 + wo, 20, 1, C.wingEdge);
+    rect(x - lw, y - 1 + wo, lw + rw, 4, WING);
+    if (b < -0.3) rect(x - lw, y - 1 + wo, lw - 4, 4, WING_D);                 // tilted-away wing in shadow
+    if (b > 0.3) rect(x + 4, y - 1 + wo, rw - 4, 4, WING_D);
+    rect(x - lw, y + 2 + wo, 3, 2, WING_D); rect(x + rw - 3, y + 2 + wo, 3, 2, WING_D);
+    rect(x - lw, y - 1 + wo, lw + rw, 1, C.wingEdge);
     // Blaster pods under the wings
     const pod = tripleT > 0 ? (Math.floor(clock * 8) % 2 ? '#E0CCFF' : '#B98CFF') : '#6B5B8C';
-    rect(x - 7, y - 3 + wo, 2, 3, pod); rect(x + 5, y - 3 + wo, 2, 3, pod);
+    rect(x - lw + 3, y - 3 + wo, 2, 3, pod); rect(x + rw - 5, y - 3 + wo, 2, 3, pod);
     // Body and tail
     rect(x - 4, y - 4, 8, 10, BODY);
     rect(x - 3, y - 6, 6, 13, BODY);
     rect(x - 3, y + 7, 6, 2, C.tail); rect(x - 2, y + 9, 4, 2, WING_D);
     // Head, helmet and goggles
-    rect(x - 3, y - 10, 6, 5, BODY);
-    rect(x - 4, y - 12, 8, 4, HELMET);
-    rect(x - 4, y - 9, 8, 1, HELMET_D);
-    rect(x - 3, y - 9, 2, 2, '#9BD8F0'); rect(x + 1, y - 9, 2, 2, '#9BD8F0');
-    rect(x - 1, y - 9, 2, 1, '#2E2E36');
-    rect(x - 2, y - 13, 1, 1, '#D62828'); rect(x, y - 13, 1, 1, '#D62828');   // comb peeking out
+    const hx = x + lean;   // the head leans into the turn
+    rect(hx - 3, y - 10, 6, 5, BODY);
+    rect(hx - 4, y - 12, 8, 4, HELMET);
+    rect(hx - 4, y - 9, 8, 1, HELMET_D);
+    rect(hx - 3, y - 9, 2, 2, '#9BD8F0'); rect(hx + 1, y - 9, 2, 2, '#9BD8F0');
+    rect(hx - 1, y - 9, 2, 1, '#2E2E36');
+    rect(hx - 2, y - 13, 1, 1, '#D62828'); rect(hx, y - 13, 1, 1, '#D62828');   // comb peeking out
     // Beak
-    rect(x - 1, y - 15, 2, 3, '#F2A33A');
+    rect(hx - 1, y - 15, 2, 3, '#F2A33A');
     // Triple laser: a small blinking purple star on her back
     if (tripleT > 0 && opt.rank == null) {
       const STAR = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
@@ -1574,7 +1586,7 @@
     }
     // Tiny rank badge on the helmet
     const ins = INSIGNIA[opt.rank != null ? opt.rank : rankIdx];
-    rect(x + 1, y - 12, 2, 2, ins.c);
+    rect(hx + 1, y - 12, 2, 2, ins.c);
   }
 
   function drawFox(x, y, dir) {
@@ -2272,7 +2284,7 @@
     }
     // Clooky
     const showPlayer = state !== 'dying' && state !== 'title' && state !== 'over' && !(invulnT > 0 && Math.floor(clock * 12) % 2 === 0);
-    if (showPlayer) drawClooky(Math.round(px), PLAYER_Y + (state === 'celebrate' ? Math.round(Math.sin(clock * 6) * 2) : 0));
+    if (showPlayer) drawClooky(Math.round(px), PLAYER_Y + (state === 'celebrate' ? Math.round(Math.sin(clock * 6) * 2) : 0), { bank: state === 'celebrate' ? 0 : bank });
     // Things in the air
     for (const o of objects) {
       if (!o.alive) continue;
