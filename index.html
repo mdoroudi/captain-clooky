@@ -339,7 +339,7 @@
     invulnerableSeconds: 2,
     bumpSeconds: 0.5,         // bonking a riverbank: the river pauses this long (no life lost)
     points: {
-      fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, alien: 150, wolfsnake: 500, crate: 20, medic: -100, wall: 50,
+      fox: 30, hawk: 100, raccoon: 60, anaconda: 80, eagle: 150, alien: 150, wolfsnake: 500, crate: 20, medic: -100, bonk: -100, wall: 50,
       levelBonus: 500, feedBonusMax: 250
     },
     level: {
@@ -1091,7 +1091,8 @@
     invulnT = Math.max(invulnT, CONFIG.bumpSeconds + 0.4);   // a quick flash, and nothing can hit you mid-bump
     puff((fromX + px) / 2, dist, 5, false, [lv.theme.shore, lv.theme.land]);
     sfx.bonk();
-    showBanner('Bonk!', 0.7);
+    addScore(CONFIG.points.bonk);   // bumping a bank costs points (never below 0)
+    showBanner('Bonk! -100', 0.9);
   }
 
   function respawn() {
