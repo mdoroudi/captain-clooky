@@ -415,7 +415,7 @@
       land: '#7A4220', landDot: '#7A4220', shore: '#4A2A10', shoreW: 2,
       patches: ['#7A4220', '#B4561C'],   // ground: an uneven checkerboard of brown and dark orange
       leaves: '#D8261E',                                 // the eagles' pine trees turn red too
-      decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, clusters: true,   // big trees in clusters, with grass between
+      decor: ['autumntree'], decorScales: { autumntree: 2, boulder: 2, autumnshrub: 2 }, stretches: true,   // short, mixed stretches of trees, rocks and shrubs
       scatter: ['boulder', 'boulder', 'boulder', 'autumnshrub', 'autumnshrub'], scatterFill: 0.9, scatterGap: 10,   // lots of gray boulders, some shrubs
       island: ['autumntree'],
       enemies: { anaconda: 0, wolfsnake: 2.2 } }         // the wolf-snake is this river's water monster
@@ -821,7 +821,7 @@
     const scaleOf = type => (theme.decorScales && theme.decorScales[type]) || theme.decorScale || 1;
     const density = theme.density || 1;
     let clusterLeft = 0;   // clustered themes: a few trees close together, then a gap
-    for (let y = 10; y < baseY + 300; y += theme.clusters ? (clusterLeft > 0 ? 9 : 34 + rng() * 30) : (14 + rng() * 22) / density) {
+    for (let y = 10; y < (theme.stretches ? 0 : baseY + 300); y += theme.clusters ? (clusterLeft > 0 ? 9 : 34 + rng() * 30) : (14 + rng() * 22) / density) {
       if (theme.clusters) clusterLeft = clusterLeft > 0 ? clusterLeft - 1 : 2 + Math.floor(rng() * 2);
       for (const side of [-1, 1, ...(theme.perRow > 1 || (theme.clusters && clusterLeft > 0) ? [-1, 1] : [])]) {
         if (rng() > (theme.fill || 0.65)) continue;
@@ -842,8 +842,44 @@
         decor.push({ type, side, y, x: Math.round(x), scale: sc });
       }
     }
+    // Stretch themes (Autumn Rapids): each bank is a patchwork of short stretches, each one a couple
+    // of big trees, a few boulders and shrubs, or a tree mixed with rocks and shrubs. The same kind
+    // never comes twice in a row, and the two banks follow their own patterns.
+    if (theme.stretches) {
+      const boxOf = d => { const [w, h] = DECOR_SIZE[d.type].map(v => v * (d.scale || 1)); return [d.x, d.y, w, h]; };
+      const placeOnBank = (type, side, y) => {
+        const sc = scaleOf(type);
+        const [dw, dh] = DECOR_SIZE[type].map(v => v * sc);
+        let edge = side < 0 ? W : 0;
+        for (let yy = y - 2; yy <= y + dh; yy += ROW) edge = side < 0 ? Math.min(edge, bankL(yy)) : Math.max(edge, bankR(yy));
+        const room = side < 0 ? edge - 6 - dw : W - edge - 6 - dw;
+        if (room < 2) return;
+        if (y > baseY - 40 && y < baseY + 175) return;                          // room for the fort, hangar and coops
+        if (trees.some(t => t.side === side && Math.abs(t.y - y) < 44)) return;   // leave the redwoods room
+        for (let tries = 0; tries < 4; tries++) {                                 // don't pile things on top of each other
+          const x = Math.round(side < 0 ? 2 + rng() * room : edge + 4 + rng() * room);
+          const hit = decor.some(d => d.side === side && (() => { const [bx, by, bw, bh] = boxOf(d); return x < bx + bw && x + dw > bx && y < by + bh && y + dh > by; })());
+          if (!hit) { decor.push({ type, side, y, x, scale: sc }); return; }
+        }
+      };
+      const pick = () => theme.scatter[Math.floor(rng() * theme.scatter.length)];
+      for (const side of [-1, 1]) {
+        let prev = '';
+        for (let y = 10 + rng() * 30; y < baseY + 300;) {
+          const kinds = ['trees', 'rocks', 'mixed'].filter(k => k !== prev);
+          const kind = kinds[Math.floor(rng() * kinds.length)];
+          prev = kind;
+          const len = 40 + rng() * 45;
+          const items = kind === 'trees' ? ['autumntree', 'autumntree']
+            : kind === 'rocks' ? [pick(), pick(), pick()]
+            : ['autumntree', pick(), pick()];
+          items.forEach((type, i) => placeOnBank(type, side, Math.round(y + (i + rng() * 0.5) * len / items.length)));
+          y += len + 4 + rng() * 12;
+        }
+      }
+    }
     // Some themes also scatter smaller things (boulders, shrubs) in the open ground between the clusters
-    if (theme.scatter) {
+    if (theme.scatter && !theme.stretches) {
       const bigOnes = decor.filter(d => d.type === theme.decor[0]);
       const gap = theme.scatterGap || 14;
       for (let y = 20; y < baseY + 300; y += gap + rng() * 16) {
