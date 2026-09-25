@@ -667,11 +667,15 @@
       L[r] = clamp(Math.round(c - w / 2), 8, W - 60);
       R[r] = clamp(Math.round(c + w / 2), L[r] + 52, W - 8);
     }
-    // Shape each island like a lens, never squeezing either channel below CHANNEL
+    // Shape each island, never squeezing either channel below CHANNEL. About half are lens-shaped
+    // ovals; the rest are boxier, with short squared-off ends and straight sides. (Which is which
+    // comes from the island's position, so levels stay the same and nothing else moves.)
     for (const [a, b] of islands) {
+      const boxy = (a * 7 + b * 13) % 2 === 0;
       for (let r = a; r <= b; r++) {
         const u = (r - a) / (b - a);
-        const iw = Math.min(D.islandMax, R[r] - L[r] - 2 * CHANNEL) * Math.sin(Math.PI * u);
+        const profile = boxy ? Math.min(1, u / 0.05, (1 - u) / 0.05) : Math.sin(Math.PI * u);
+        const iw = Math.min(D.islandMax, R[r] - L[r] - 2 * CHANNEL) * profile;
         if (iw < 8) continue;
         const cc = (L[r] + R[r]) / 2;
         IL[r] = Math.round(cc - iw / 2); IR[r] = Math.round(cc + iw / 2);
