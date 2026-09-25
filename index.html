@@ -381,8 +381,9 @@
       water: '#3A0808', streak: '#5E1A18', land: '#2F5FCF', landDot: '#FFFFFF', shore: '#9FC3FF', shoreW: 2,
       decor: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'stars', 'stars', 'alien', 'alien', 'alien'], island: ['asteroid', 'asteroid'],
       islandFirst: 'neptuneRock' },
-    { key: 'alienplanet', name: 'Alien Planet',   // smoky orange river on a dark brown planet, giant Jupiter on the right
-      water: '#C4622A', streak: '#E8955A', land: '#3A2416', landDot: '#24160C', shore: '#6E4428', shoreW: 3, smoke: true, jupiter: true,
+    { key: 'alienplanet', name: 'Alien Planet',   // smoky orange river on a dark blue planet, giant Jupiter on the right
+      water: '#C4622A', streak: '#E8955A', land: '#172050', landDot: '#0E1538', shore: '#3A4C96', shoreW: 3, smoke: true, jupiter: true,
+      leaves: '#FF6FB5',                    // pink leaves on the pine trees
       decorScales: { rocket: 2, ufo: 2 },   // big rocket ships and saucers
       decor: ['rocket', 'rocket', 'ufo', 'ufo', 'crater', 'crater'], island: ['crater', 'ufo'],
       enemies: { raccoon: 0, alien: 4.5 } }   // red aliens take the raccoons' place
@@ -1582,7 +1583,7 @@
     const hop = Math.round(o.hop || 0);
     const crouch = o.phase === 'wait' ? Math.round(Math.abs(Math.sin(clock * 6 + o.y))) : 0;
     const yy = y - hop + crouch;
-    if (hop > 2) { ctx.globalAlpha = 0.25; rect(x - 6, y + 4, 12, 2, '#1A0A04'); ctx.globalAlpha = 1; }   // shadow
+    if (hop > 2) { ctx.globalAlpha = 0.25; rect(x - 6, y + 4, 12, 2, '#05081E'); ctx.globalAlpha = 1; }   // shadow
     rect(x - 3, yy - 3, 7, 5, RED); rect(x - 2, yy - 2, 5, 3, DARK);             // body
     if (hop > 2) { rect(x - 6, yy - 4, 3, 1, RED); rect(x + 4, yy - 4, 3, 1, RED); }   // arms up while leaping
     else { rect(x - 5, yy - 2, 2, 1, RED); rect(x + 4, yy - 2, 2, 1, RED); }
@@ -1843,13 +1844,14 @@
       case 'redwood': {
         // Tall redwood: reddish trunk, layered dark crown; the eagle perches on top
         const snow = lv.theme.key === 'ice';
+        const leaves = lv.theme.leaves || '#1F5A36';
         rect(x + 6, y - 26, 3, 26, '#8A3A22'); rect(x + 6, y - 26, 1, 26, '#A8543A');
         for (let i = 0; i < 4; i++) {
           const w = 6 + i * 2;
-          rect(x + 7 - w / 2, y - 30 + i * 6, w, 4, '#1F5A36');
+          rect(x + 7 - w / 2, y - 30 + i * 6, w, 4, leaves);
           if (snow) rect(x + 7 - w / 2, y - 30 + i * 6, w, 1, '#FFFFFF');
         }
-        rect(x + 5, y - 33, 4, 3, '#1F5A36');
+        rect(x + 5, y - 33, 4, 3, leaves);
         break;
       }
       case 'slimerock':   // gray rock with green sludge dripping down it
@@ -1920,8 +1922,8 @@
         break;
       }
       case 'crater':
-        rect(x + 1, y - 4, 9, 4, '#24160C'); rect(x, y - 3, 11, 2, '#24160C');
-        rect(x + 1, y - 5, 9, 1, '#6E4428'); rect(x + 2, y - 1, 7, 1, '#4E3020'); break;
+        rect(x + 1, y - 4, 9, 4, '#0B1030'); rect(x, y - 3, 11, 2, '#0B1030');
+        rect(x + 1, y - 5, 9, 1, '#3A4C96'); rect(x + 2, y - 1, 7, 1, '#26306A'); break;
       case 'igloo':
         rect(x + 1, y - 7, 10, 7, '#FFFFFF'); rect(x + 3, y - 8, 6, 1, '#FFFFFF'); rect(x + 4, y - 4, 3, 4, '#4F6F8F');
         rect(x + 1, y - 4, 10, 1, '#DCE9F3'); break;
@@ -1993,7 +1995,7 @@
     }
     // Shadowed left edge
     ctx.globalAlpha = 0.35;
-    for (let dy = -r; dy <= r; dy++) { const half = Math.round(Math.sqrt(r * r - dy * dy)); rect(cx - half, cy + dy, 6, 1, '#3A2416'); }
+    for (let dy = -r; dy <= r; dy++) { const half = Math.round(Math.sqrt(r * r - dy * dy)); rect(cx - half, cy + dy, 6, 1, '#0E1538'); }
     ctx.globalAlpha = 1;
     ctx.restore();
   }
