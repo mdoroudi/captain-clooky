@@ -97,6 +97,7 @@
     cursor: pointer;
   }
   .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.4em; height: 1.8em; padding: 0; }
+  .icon-btn[hidden] { display: none; }   /* skip and pause stay hidden on the title and game-over screens */
   .icon-btn svg { width: 1.15em; height: 1.15em; display: block; }
   .devbar {
     width: var(--w, 100%);
@@ -127,6 +128,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    justify-content: safe center;   /* on short screens, start at the top and scroll instead of spilling out */
+    overflow-y: auto;
     gap: 0.8em;
     padding: 1em;
     background: var(--shade);
@@ -225,6 +228,10 @@
   }
   .tbtn.on { transform: translateY(3px); box-shadow: 0 1px 0 #B9A98C; filter: brightness(0.92); }
   .tbtn.fire.on { box-shadow: 0 1px 0 #5B2FA8; }
+  /* Not flying (title, pause, level complete, game over): controls are greyed out and can't be tapped */
+  .touch-pad.off { pointer-events: none; }
+  body.touch.side .touch-pad.off .pad-group { pointer-events: none; }
+  .touch-pad.off .tbtn { opacity: 0.3; filter: grayscale(1); box-shadow: none; }
   /* Short landscape screens: the pads sit beside the game instead of under it */
   body.touch.side .touch-pad {
     position: fixed; left: 0; right: 0; bottom: 12px;
@@ -2255,7 +2262,10 @@
   //  Loop
   // =====================================================================
   let last = performance.now();
+  const touchPad = $('touchPad');
+  const FLYING = ['intro', 'playing', 'dying'];
   function frame(now) {
+    touchPad.classList.toggle('off', !FLYING.includes(state));
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     pollGamepad();
@@ -2293,6 +2303,11 @@
   // Skip level (for everyone): straight to the next level, keeping score and lives but no level bonus
   $('skipBtn').addEventListener('click', () => {
     ensureAudio();
+    if (state === 'paused' && (resumeState === 'playing' || resumeState === 'intro' || resumeState === 'dying')) {
+      pauseScreen.hidden = true;   // skipping from the pause screen unpauses first
+      setPauseIcon(false);
+      state = 'playing';
+    }
     if (state !== 'playing' && state !== 'intro') return;
     $('skipBtn').blur();
     level++;
